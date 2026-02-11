@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { AIAnalysisResult } from "../types";
 
@@ -9,8 +8,14 @@ export const analyzeWithGemini = async (
   projectDesc: string,
   mediaName: string = "内部稿件"
 ): Promise<AIAnalysisResult> => {
-  // Fix: Initializing GoogleGenAI client instance with the required named parameter apiKey from environment variables.
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  // 从环境变量获取 Key
+  const apiKey = process.env.API_KEY;
+
+  if (!apiKey || apiKey === "undefined" || apiKey === "") {
+    throw new Error("API_KEY 缺失！请确保已在 Netlify 环境变量中设置 API_KEY 并且已在 Site configuration 中禁用 Sensitive variable detection。");
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
   
   const prompt = `你是一个专业的肿瘤业务公关传播分析师。请基于以下项目背景和评分规则，对提供的文本内容进行深度评估。
   
@@ -28,39 +33,46 @@ export const analyzeWithGemini = async (
 待分析内容：
 ${content.substring(0, 5000)}`;
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          km_score: {
-            type: Type.NUMBER,
-            description: "信息匹配得分 (0-10)",
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            km_score: {
+              type: Type.NUMBER,
+              description: "信息匹配得分 (0-10)",
+            },
+            acquisition_score: {
+              type: Type.NUMBER,
+              description: "获客效能得分 (0-10)",
+            },
+            audience_precision_score: {
+              type: Type.NUMBER,
+              description: "受众精准度得分 (0-10)",
+            },
+            comment: {
+              type: Type.STRING,
+              description: "专业且简短的评分意见，指出优缺点",
+            },
           },
-          acquisition_score: {
-            type: Type.NUMBER,
-            description: "获客效能得分 (0-10)",
-          },
-          audience_precision_score: {
-            type: Type.NUMBER,
-            description: "受众精准度得分 (0-10)",
-          },
-          comment: {
-            type: Type.STRING,
-            description: "专业且简短的评分意见，指出优缺点",
-          },
+          required: ["km_score", "acquisition_score", "audience_precision_score", "comment"],
         },
-        required: ["km_score", "acquisition_score", "audience_precision_score", "comment"],
       },
-    },
-  });
+    });
 
-  // Fix: Correctly access the text property directly from GenerateContentResponse (not a method).
-  const text = response.text;
-  if (!text) throw new Error("AI 返回了空响应");
-  
-  return JSON.parse(text) as AIAnalysisResult;
+    const text = response.text;
+    if (!text) throw new Error("AI 返回了空响应");
+    
+    return JSON.parse(text) as AIAnalysisResult;
+  } catch (e: any) {
+    console.error("Gemini API Error:", e);
+    if (e.message?.includes("API key not valid")) {
+      throw new Error("API Key 无效，请检查 Netlify 中的环境变量是否正确。");
+    }
+    throw new Error(`分析失败: ${e.message || "未知错误"}`);
+  }
 };
