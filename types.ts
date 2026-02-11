@@ -17,6 +17,7 @@ export interface WordResult extends AIAnalysisResult {
 }
 
 export interface BatchResult {
+  标题: string;
   媒体名称: string;
   项目总分: string;
   真需求: string;

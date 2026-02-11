@@ -17,18 +17,18 @@ export const analyzeWithGemini = async (
 
   const ai = new GoogleGenAI({ apiKey });
   
-  const prompt = `你是一个专业的肿瘤业务公关传播分析师。请基于以下项目背景和评分规则，对提供的文本内容进行深度评估。
-  
+  const prompt = `你是一个专业的肿瘤业务公关传播分析师。请基于以下项目背景和极其严格的评估维度，对提供的文本内容进行评分。
+
 评分规则 (0-10分):
-1. 信息匹配 (km_score): 文本内容与项目核心信息的吻合程度。
-2. 获客效能 (acquisition_score): 文本对目标受众产生的行动转化潜力（如扫码、咨询、预约等）。
-3. 受众精准度 (audience_precision_score): 文本表达风格、专业深度与目标受众模式的匹配度。
+1. 信息匹配 (km_score): 【唯一依据】是评估文本正文内容与[核心信息 (Key Message)]的吻合程度。正文是否准确、完整地传达了核心信息？
+2. 获客效能 (acquisition_score): 【唯一依据】是评估文本正文如何转化[项目描述]中定义的获客或业务目标。正文是否具备引导受众采取项目描述中行动的能力？
+3. 受众精准度 (audience_precision_score): 【唯一依据】是评估当前[媒体名称]是否能精准触达选定的[受众模式]。该媒体在所选受众群体中的渗透力和调性匹配度如何？
 
 项目背景：
 - 媒体名称: ${mediaName}
 - 受众模式: ${audienceMode}
 - 核心信息 (Key Message): ${projectKeyMessage}
-- 项目描述: ${projectDesc}
+- 项目描述 (获客逻辑): ${projectDesc}
 
 待分析内容：
 ${content.substring(0, 5000)}`;
@@ -70,9 +70,6 @@ ${content.substring(0, 5000)}`;
     return JSON.parse(text) as AIAnalysisResult;
   } catch (e: any) {
     console.error("Gemini API Error:", e);
-    if (e.message?.includes("API key not valid")) {
-      throw new Error("API Key 无效，请检查 Netlify 中的环境变量是否正确。");
-    }
     throw new Error(`分析失败: ${e.message || "未知错误"}`);
   }
 };

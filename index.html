@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -9,6 +10,7 @@
     <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.8/mammoth.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         body { 
             background-color: #ffffff; 
@@ -72,6 +74,9 @@
             cursor: pointer;
             font-weight: 500;
             transition: background 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
         }
         .st-button-primary:hover {
             background-color: #1565c0;
@@ -187,6 +192,17 @@
         }
         .animate-fadeIn {
             animation: fadeIn 0.4s ease-out forwards;
+        }
+
+        /* 打印样式优化 */
+        @media print {
+            .st-sidebar, .resize-handle, .st-tabs-list, .st-expander, .flex-gap, button, .no-print {
+                display: none !important;
+            }
+            .main-content {
+                padding: 0 !important;
+                margin: 0 !important;
+            }
         }
     </style>
 <script type="importmap">
