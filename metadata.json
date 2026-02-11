@@ -1,0 +1,5 @@
+{
+  "name": "肿瘤业务-传播价值 AI 评分系统",
+  "description": "基于 Gemini AI 的专业公关传播分析工具，用于评估肿瘤业务新闻稿、媒体报道及整体项目的传播价值。",
+  "requestFramePermissions": []
+}

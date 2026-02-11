@@ -1,0 +1,207 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>肿瘤业务-传播价值 AI 评分系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Visualization and File Processing Libraries -->
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.8/mammoth.browser.min.js"></script>
+    <style>
+        body { 
+            background-color: #ffffff; 
+            color: #31333F; 
+            font-family: "Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+            overflow-x: hidden;
+        }
+
+        .st-sidebar {
+            background-color: #f8f9fa;
+            border-right: 1px solid #e0e0e0;
+            height: 100vh;
+            position: fixed;
+            left: 0;
+            top: 0;
+            padding: 4.5rem 1.5rem 1.5rem 1.5rem;
+            overflow-y: auto;
+            z-index: 100;
+        }
+
+        .main-content {
+            padding: 6rem 5rem 3rem 5rem;
+            min-height: 100vh;
+        }
+
+        .resize-handle {
+            width: 4px;
+            height: 100vh;
+            cursor: col-resize;
+            position: fixed;
+            z-index: 101;
+            transition: background 0.2s;
+        }
+        .resize-handle:hover, .resize-handle.active {
+            background: #1E88E5;
+        }
+
+        .st-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            font-size: 14px;
+            color: #31333F;
+            background-color: #ffffff;
+            outline: none;
+        }
+        .st-input:focus {
+            border-color: #1E88E5;
+            box-shadow: 0 0 0 1px #1E88E5;
+        }
+
+        .st-button-primary {
+            background-color: #1E88E5;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        .st-button-primary:hover {
+            background-color: #1565c0;
+        }
+
+        .st-tabs-list {
+            display: flex;
+            border-bottom: 1px solid #e0e0e0;
+            margin-bottom: 2rem;
+        }
+        .st-tab {
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            color: #31333F;
+            font-size: 14px;
+        }
+        .st-tab:hover {
+            color: #1E88E5;
+        }
+        .st-tab-active {
+            border-bottom-color: #1E88E5;
+            color: #1E88E5;
+            font-weight: 600;
+        }
+
+        .st-metric {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid #f0f2f6;
+            text-align: left;
+        }
+        .st-metric-label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 0.25rem;
+        }
+        .st-metric-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #1E88E5;
+        }
+
+        .st-expander {
+            border: 1px solid #f0f2f6;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            overflow: hidden;
+        }
+        .st-expander-header {
+            padding: 0.75rem 1rem;
+            background: #ffffff;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+        }
+        .st-expander-content {
+            padding: 1.5rem;
+            background: #f8f9fa;
+            border-top: 1px solid #f0f2f6;
+        }
+
+        .st-alert {
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            font-size: 14px;
+            word-break: break-all;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
+        .st-info {
+            background-color: #e3f2fd;
+            border: 1px solid #90caf9;
+            color: #0d47a1;
+        }
+        .st-success {
+            background-color: #e8f5e9;
+            border: 1px solid #a5d6a7;
+            color: #1b5e20;
+        }
+        .st-error {
+            background-color: #ffebee;
+            border: 1px solid #ffcdd2;
+            color: #b71c1c;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        th {
+            background-color: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            padding: 8px;
+            text-align: left;
+        }
+        td {
+            border: 1px solid #e0e0e0;
+            padding: 8px;
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadeIn {
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://esm.sh/@google/genai@^1.40.0",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/"
+  }
+}
+</script>
+</head>
+<body>
+    <div id="root"></div>
+</body>
+</html>
