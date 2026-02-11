@@ -207,6 +207,15 @@ const App: React.FC = () => {
     reader.readAsArrayBuffer(file);
   };
 
+  const handleReset = () => {
+    if (window.confirm("确定要清空所有已分析的数据吗？该操作不可撤销。")) {
+      setWordResult(null);
+      setBatchResults(null);
+      setProgress(0);
+      setErrorLog("");
+    }
+  };
+
   // --- Rendering Charts ---
   useEffect(() => {
     if (activeTab === "tab3" && batchResults && window.Plotly) {
@@ -258,61 +267,73 @@ const App: React.FC = () => {
   return (
     <div className="flex">
       {/* --- Sidebar --- */}
-      <div className="st-sidebar no-scrollbar" style={{ width: sidebarWidth }}>
-        <h2 className="text-lg font-bold mb-4">⚙️ 规则配置</h2>
-        
-        <h3 className="text-sm font-bold mt-6 mb-2">📋 项目信息</h3>
-        <label className="text-xs font-semibold text-gray-600 block mb-1">项目名称</label>
-        <input 
-          value={projectName} 
-          onChange={e => setProjectName(e.target.value)} 
-          className="st-input" 
-        />
-        
-        <label className="text-xs font-semibold text-gray-600 block mb-1">核心信息 (Key Message)</label>
-        <input 
-          value={projectKeyMessage} 
-          onChange={e => setProjectKeyMessage(e.target.value)} 
-          className="st-input" 
-        />
-        
-        <label className="text-xs font-semibold text-gray-600 block mb-1">项目描述 (用于评估获客)</label>
-        <textarea 
-          value={projectDesc} 
-          onChange={e => setProjectDesc(e.target.value)} 
-          className="st-input h-24 no-scrollbar" 
-        />
-        
-        <label className="text-xs font-semibold text-gray-600 block mb-2">目标受众模式</label>
-        <div className="space-y-1 mb-6">
-          {[AudienceMode.GENERAL, AudienceMode.PATIENT, AudienceMode.HCP].map(m => (
-            <label key={m} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-              <input 
-                type="radio" 
-                checked={audienceMode === m} 
-                onChange={() => setAudienceMode(m)} 
-                className="w-4 h-4" 
-              />
-              {m}
-            </label>
-          ))}
-        </div>
-        
-        <div className="border-t pt-4">
-          <h3 className="text-sm font-bold mb-1">🏆 媒体分级</h3>
-          <p className="text-[10px] text-gray-400 mb-2">使用逗号分隔媒体名称</p>
-          {(['tier1', 'tier2', 'tier3'] as Array<keyof Tiers>).map(t => (
-            <div key={t} className="mb-2">
-              <label className="text-[10px] font-bold text-gray-500 block uppercase">
-                {t === 'tier1' ? 'Tier 1 (10分)' : t === 'tier2' ? 'Tier 2 (8分)' : 'Tier 3 (5分)'}
+      <div className="st-sidebar no-scrollbar flex flex-col" style={{ width: sidebarWidth }}>
+        <div className="flex-1">
+          <h2 className="text-lg font-bold mb-4">⚙️ 规则配置</h2>
+          
+          <h3 className="text-sm font-bold mt-6 mb-2">📋 项目信息</h3>
+          <label className="text-xs font-semibold text-gray-600 block mb-1">项目名称</label>
+          <input 
+            value={projectName} 
+            onChange={e => setProjectName(e.target.value)} 
+            className="st-input" 
+          />
+          
+          <label className="text-xs font-semibold text-gray-600 block mb-1">核心信息 (Key Message)</label>
+          <input 
+            value={projectKeyMessage} 
+            onChange={e => setProjectKeyMessage(e.target.value)} 
+            className="st-input" 
+          />
+          
+          <label className="text-xs font-semibold text-gray-600 block mb-1">项目描述 (用于评估获客)</label>
+          <textarea 
+            value={projectDesc} 
+            onChange={e => setProjectDesc(e.target.value)} 
+            className="st-input h-24 no-scrollbar" 
+          />
+          
+          <label className="text-xs font-semibold text-gray-600 block mb-2">目标受众模式</label>
+          <div className="space-y-1 mb-6">
+            {[AudienceMode.GENERAL, AudienceMode.PATIENT, AudienceMode.HCP].map(m => (
+              <label key={m} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                <input 
+                  type="radio" 
+                  checked={audienceMode === m} 
+                  onChange={() => setAudienceMode(m)} 
+                  className="w-4 h-4" 
+                />
+                {m}
               </label>
-              <textarea 
-                value={tiers[t]} 
-                onChange={e => setTiers({...tiers, [t]: e.target.value})} 
-                className="st-input h-16 no-scrollbar text-xs" 
-              />
-            </div>
-          ))}
+            ))}
+          </div>
+          
+          <div className="border-t pt-4">
+            <h3 className="text-sm font-bold mb-1">🏆 媒体分级</h3>
+            <p className="text-[10px] text-gray-400 mb-2">使用逗号分隔媒体名称</p>
+            {(['tier1', 'tier2', 'tier3'] as Array<keyof Tiers>).map(t => (
+              <div key={t} className="mb-2">
+                <label className="text-[10px] font-bold text-gray-500 block uppercase">
+                  {t === 'tier1' ? 'Tier 1 (10分)' : t === 'tier2' ? 'Tier 2 (8分)' : 'Tier 3 (5分)'}
+                </label>
+                <textarea 
+                  value={tiers[t]} 
+                  onChange={e => setTiers({...tiers, [t]: e.target.value})} 
+                  className="st-input h-16 no-scrollbar text-xs" 
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Reset Button at the bottom of sidebar */}
+        <div className="pt-6 border-t mt-6 mb-8">
+          <button 
+            onClick={handleReset}
+            className="w-full py-2 px-4 border border-red-300 text-red-600 rounded hover:bg-red-50 transition-colors text-sm font-medium flex items-center justify-center gap-2"
+          >
+            🗑️ 清空所有分析数据
+          </button>
         </div>
       </div>
 
