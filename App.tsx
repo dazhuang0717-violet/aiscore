@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { analyzeWithGemini } from './services/geminiService';
 import { Tiers, WordResult, BatchResult, AudienceMode, AIAnalysisResult } from './types';
@@ -48,7 +47,6 @@ const App: React.FC = () => {
   // --- Table Interaction State ---
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
   
-  // 维护列显示状态
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
     "标题": true,
     "媒体名称": true,
@@ -56,7 +54,7 @@ const App: React.FC = () => {
     "受众精准度": true,
     "传播质量": true,
     "声量": true,
-    "项目总分": false, // 用户要求删除
+    "项目总分": false, 
     "真需求": false,
     "获客效能": false,
     "核心信息匹配": false
@@ -64,7 +62,6 @@ const App: React.FC = () => {
 
   const pickableColumns = ["标题", "媒体名称", "媒体分级", "受众精准度", "传播质量", "声量"];
 
-  // --- Resize Logic ---
   const startResizing = useCallback(() => setIsResizing(true), []);
   const stopResizing = useCallback(() => setIsResizing(false), []);
   const resize = useCallback((e: MouseEvent) => {
@@ -83,7 +80,6 @@ const App: React.FC = () => {
     };
   }, [resize, stopResizing]);
 
-  // --- Core Utility Functions ---
   const calculateVolumeQuality = (views: any, interactions: any): number => {
     try {
       const cleanNum = (x: any) => {
@@ -95,9 +91,9 @@ const App: React.FC = () => {
       };
       const v = cleanNum(views);
       const i = cleanNum(interactions);
-      const rawScore = Math.log10(v + i * 5 + 1) * 1.5;
+      const rawScore = Math.log10(v + i * 5 + 10) * 1.5;
       return Math.min(10.0, Math.round(rawScore * 10) / 10);
-    } catch { return 0.0; }
+    } catch { return 1.0; }
   };
 
   const getMediaTierScore = (mediaName: string): number => {
@@ -123,7 +119,6 @@ const App: React.FC = () => {
     setIsProcessing(true);
     setErrorLog("");
     setWordResult(null);
-
     try {
       const arrayBuffer = await file.arrayBuffer();
       const result = await window.mammoth.extractRawText({ arrayBuffer });
@@ -169,16 +164,17 @@ const App: React.FC = () => {
           const tierScore = getMediaTierScore(mediaName);
           const volTotal = 0.6 * volQuality + 0.4 * tierScore;
           
-          let aiRes: AIAnalysisResult = { km_score: 0, acquisition_score: 0, audience_precision_score: 0, comment: "待评估" };
-          let content = row['正文'] || row['Content'] || row['标题'] || "";
+          let aiRes: AIAnalysisResult = { km_score: 1, acquisition_score: 1, audience_precision_score: 1, comment: "待评估" };
+          let content = row['正文'] || row['Content'] || row['标题'] || title || "";
           
           if (!content && url && url.startsWith("http")) {
             const scraped = await fetchUrlContent(url);
             if (scraped) content = scraped;
           }
           
-          if (content) {
+          if (content || mediaName) {
             try { 
+              if (i > 0) await new Promise(res => setTimeout(res, 800));
               aiRes = await analyzeWithGemini(content, audienceMode, projectKeyMessage, projectDesc, mediaName); 
             } catch (e: any) { aiRes.comment = `AI分析失败: ${e.message}`; }
           }
@@ -248,9 +244,7 @@ const App: React.FC = () => {
         }
         const strA = String(valA);
         const strB = String(valB);
-        return sortConfig.direction === 'asc' 
-          ? strA.localeCompare(strB, 'zh-CN') 
-          : strB.localeCompare(strA, 'zh-CN');
+        return sortConfig.direction === 'asc' ? strA.localeCompare(strB, 'zh-CN') : strB.localeCompare(strA, 'zh-CN');
       });
     }
     return sortableItems;
@@ -305,42 +299,45 @@ const App: React.FC = () => {
         margin: { t: 60, b: 60, l: 80, r: 80 } 
       }, { displayModeBar: false, responsive: true });
 
-      // 散点图：优化象限显示
+      // 散点图优化：增加随机抖动 (Jitter) 和 自定义 Hover 模板
+      const scatterX = batchResults.map(d => parseFloat(d.声量) + (Math.random() - 0.5) * 0.3);
+      const scatterY = batchResults.map(d => parseFloat(d.真需求) + (Math.random() - 0.5) * 0.3);
+      const hoverTexts = batchResults.map(d => `<b>${d.媒体名称}</b><br>标题: ${d.标题.substring(0,15)}...<br>总分: ${d.项目总分}<br>媒体分级: ${d.媒体分级}`);
+
       window.Plotly.newPlot('scatter-chart', [{
-        x: batchResults.map(d => parseFloat(d.声量)), 
-        y: batchResults.map(d => parseFloat(d.真需求)),
-        mode: 'markers+text', 
-        text: batchResults.map(d => d.媒体名称),
-        textposition: 'top center',
+        x: scatterX, 
+        y: scatterY,
+        mode: 'markers', 
+        hoverinfo: 'text',
+        text: hoverTexts,
         marker: { 
-          size: batchResults.map(d => Math.min(35, Math.max(12, parseFloat(d.项目总分) * 3))), 
+          size: batchResults.map(d => Math.min(45, Math.max(16, parseFloat(d.项目总分) * 4))), 
           color: batchResults.map(d => parseFloat(d.项目总分)), 
-          colorscale: 'Blues', 
+          colorscale: [
+            [0, '#E3F2FD'],
+            [0.5, '#64B5F6'],
+            [1, '#0D47A1']
+          ],
           showscale: true,
-          opacity: 0.85,
-          line: { width: 1.5, color: '#fff' }
+          opacity: 0.8,
+          line: { width: 1.5, color: '#ffffff' }
         }
       }], { 
-        xaxis: { 
-          title: '声量 (0-10)', 
-          range: [-0.5, 10.5], 
-          gridcolor: '#f0f0f0',
-          zeroline: false
-        }, 
-        yaxis: { 
-          title: '真需求 (0-10)', 
-          range: [-0.5, 10.5], 
-          gridcolor: '#f0f0f0',
-          zeroline: false
-        }, 
+        xaxis: { title: '声量 (0-10)', range: [-0.5, 10.5], gridcolor: '#f0f0f0', zeroline: false }, 
+        yaxis: { title: '真需求 (0-10)', range: [-0.5, 10.5], gridcolor: '#f0f0f0', zeroline: false }, 
         shapes: [
-          // 添加象限十字辅助线
-          { type: 'line', x0: 5, y0: 0, x1: 5, y1: 10, line: { color: '#ddd', width: 1, dash: 'dash' } },
-          { type: 'line', x0: 0, y0: 5, x1: 10, y1: 5, line: { color: '#ddd', width: 1, dash: 'dash' } }
+          // 象限划分线条
+          { type: 'line', x0: 5, y0: 0, x1: 5, y1: 10, line: { color: '#bbb', width: 1, dash: 'dot' } },
+          { type: 'line', x0: 0, y0: 5, x1: 10, y1: 5, line: { color: '#bbb', width: 1, dash: 'dot' } },
+          // 象限背景色
+          { type: 'rect', x0: 5, y0: 5, x1: 10, y1: 10, fillcolor: 'rgba(30, 136, 229, 0.05)', line: {width: 0}, layer: 'below' },
+          { type: 'rect', x0: 0, y0: 0, x1: 5, y1: 5, fillcolor: 'rgba(158, 158, 158, 0.05)', line: {width: 0}, layer: 'below' }
         ],
         annotations: [
-          { x: 9, y: 9.5, text: '高价值区', showarrow: false, font: { color: '#ccc', size: 10 } },
-          { x: 1, y: 0.5, text: '潜力区', showarrow: false, font: { color: '#ccc', size: 10 } }
+          { x: 7.5, y: 9.5, text: '核心媒体 (高量高质)', showarrow: false, font: { color: '#1E88E5', size: 10 } },
+          { x: 2.5, y: 9.5, text: '精准媒体 (小众深耕)', showarrow: false, font: { color: '#777', size: 10 } },
+          { x: 7.5, y: 0.5, text: '泛分发媒体 (大众曝光)', showarrow: false, font: { color: '#777', size: 10 } },
+          { x: 2.5, y: 0.5, text: '边缘分发', showarrow: false, font: { color: '#bbb', size: 10 } }
         ],
         plot_bgcolor: '#ffffff',
         autosize: true, 
@@ -366,7 +363,7 @@ const App: React.FC = () => {
           <input value={projectName} onChange={e => setProjectName(e.target.value)} className="st-input" />
           <label className="text-xs font-semibold text-gray-600 block mb-1">核心信息 (Key Message)</label>
           <input value={projectKeyMessage} onChange={e => setProjectKeyMessage(e.target.value)} className="st-input" />
-          <label className="text-xs font-semibold text-gray-600 block mb-1">项目描述 (用于评估获客)</label>
+          <label className="text-xs font-semibold text-gray-600 block mb-1">项目描述 (用于评估获客逻辑)</label>
           <textarea value={projectDesc} onChange={e => setProjectDesc(e.target.value)} className="st-input h-24 no-scrollbar" />
           <label className="text-xs font-semibold text-gray-600 block mb-2">目标受众模式</label>
           <div className="space-y-1 mb-6">
@@ -457,12 +454,10 @@ const App: React.FC = () => {
                   <h3 className="font-bold">📋 媒体报道评分</h3>
                   <div className="flex gap-2">
                     <div className="relative">
-                      <button onClick={() => setShowColPicker(!showColPicker)} className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded text-xs font-medium border border-gray-300 flex items-center gap-1 transition-all">
-                        📊 列显示
-                      </button>
+                      <button onClick={() => setShowColPicker(!showColPicker)} className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded text-xs font-medium border border-gray-300 flex items-center gap-1 transition-all">📊 列显示</button>
                       {showColPicker && (
                         <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-50 p-3 w-48 animate-fadeIn">
-                          <p className="text-[10px] font-bold text-gray-400 mb-2 uppercase">选择显示的列</p>
+                          <p className="text-[10px] font-bold text-gray-400 mb-2 uppercase">显示列</p>
                           {pickableColumns.map(col => (
                             <label key={col} className="flex items-center gap-2 mb-1 cursor-pointer hover:bg-gray-50 p-1 rounded transition-colors">
                               <input type="checkbox" checked={visibleColumns[col]} onChange={() => setVisibleColumns({...visibleColumns, [col]: !visibleColumns[col]})} className="w-3 h-3" />
@@ -479,23 +474,23 @@ const App: React.FC = () => {
                   <table className="border-separate border-spacing-0 w-full table-fixed">
                     <thead className="sticky top-0 z-10 shadow-sm">
                       <tr>
-                        {visibleColumns["标题"] && <th onClick={() => requestSort('标题')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors">标题 {sortConfig?.key === '标题' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>}
-                        {visibleColumns["媒体名称"] && <th onClick={() => requestSort('媒体名称')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors">媒体名称 {sortConfig?.key === '媒体名称' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>}
-                        {visibleColumns["媒体分级"] && <th onClick={() => requestSort('媒体分级')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors">媒体分级 {sortConfig?.key === '媒体分级' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>}
-                        {visibleColumns["受众精准度"] && <th onClick={() => requestSort('受众精准度')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors">受众精准度 {sortConfig?.key === '受众精准度' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>}
-                        {visibleColumns["传播质量"] && <th onClick={() => requestSort('传播质量')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors">传播质量 {sortConfig?.key === '传播质量' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>}
-                        {visibleColumns["声量"] && <th onClick={() => requestSort('声量')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left font-bold cursor-pointer hover:bg-gray-200 transition-colors">声量 {sortConfig?.key === '声量' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>}
+                        {visibleColumns["标题"] && <th onClick={() => requestSort('标题')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors text-xs">标题</th>}
+                        {visibleColumns["媒体名称"] && <th onClick={() => requestSort('媒体名称')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors text-xs">媒体名称</th>}
+                        {visibleColumns["媒体分级"] && <th onClick={() => requestSort('媒体分级')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors text-xs">媒体分级</th>}
+                        {visibleColumns["受众精准度"] && <th onClick={() => requestSort('受众精准度')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors text-xs">受众精准度</th>}
+                        {visibleColumns["传播质量"] && <th onClick={() => requestSort('传播质量')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors text-xs">传播质量</th>}
+                        {visibleColumns["声量"] && <th onClick={() => requestSort('声量')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left font-bold cursor-pointer hover:bg-gray-200 transition-colors text-xs">声量</th>}
                       </tr>
                     </thead>
                     <tbody>
                       {sortedResults?.map((r, i) => (
                         <tr key={i} className="hover:bg-blue-50/50 transition-colors border-b">
-                          {visibleColumns["标题"] && <td className="py-2 px-4 truncate text-xs" title={r.标题}>{r.标题}</td>}
-                          {visibleColumns["媒体名称"] && <td className="py-2 px-4 truncate text-xs">{r.媒体名称}</td>}
-                          {visibleColumns["媒体分级"] && <td className="py-2 px-4 text-xs">{r.媒体分级}</td>}
-                          {visibleColumns["受众精准度"] && <td className="py-2 px-4 text-xs">{r.受众精准度}</td>}
-                          {visibleColumns["传播质量"] && <td className="py-2 px-4 text-xs">{r.传播质量}</td>}
-                          {visibleColumns["声量"] && <td className="py-2 px-4 font-bold text-[#1E88E5] text-xs">{r.声量}</td>}
+                          {visibleColumns["标题"] && <td className="py-2 px-4 truncate text-[11px]" title={r.标题}>{r.标题}</td>}
+                          {visibleColumns["媒体名称"] && <td className="py-2 px-4 truncate text-[11px]">{r.媒体名称}</td>}
+                          {visibleColumns["媒体分级"] && <td className="py-2 px-4 text-[11px]">{r.媒体分级}</td>}
+                          {visibleColumns["受众精准度"] && <td className="py-2 px-4 text-[11px]">{r.受众精准度}</td>}
+                          {visibleColumns["传播质量"] && <td className="py-2 px-4 text-[11px]">{r.传播质量}</td>}
+                          {visibleColumns["声量"] && <td className="py-2 px-4 font-bold text-[#1E88E5] text-[11px]">{r.声量}</td>}
                         </tr>
                       ))}
                     </tbody>
@@ -513,14 +508,8 @@ const App: React.FC = () => {
             ) : (
               <div className="space-y-10 w-full overflow-hidden" id="project-report-content">
                 <h3 className="text-xl font-bold">📈 项目评分: {projectName || '未命名项目'}</h3>
-                
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                  {[ 
-                    { l: "项目总分", k: "项目总分" }, 
-                    { l: "真需求", k: "真需求" }, 
-                    { l: "获客效能", k: "获客效能" }, 
-                    { l: "声量", k: "声量" } 
-                  ].map(m => {
+                  {[{ l: "项目总分", k: "项目总分" }, { l: "真需求", k: "真需求" }, { l: "获客效能", k: "获客效能" }, { l: "声量", k: "声量" }].map(m => {
                     const avgVal = batchResults.reduce((a, b) => a + parseFloat(b[m.k as keyof BatchResult] as string || "0"), 0) / batchResults.length;
                     return (
                       <div key={m.l} className="st-metric shadow-sm border border-blue-50">
@@ -542,7 +531,6 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
-                {/* --- 媒体榜单 --- */}
                 <div className="mt-10 animate-fadeIn">
                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2">🏆 媒体榜单</h3>
                    <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
@@ -559,10 +547,7 @@ const App: React.FC = () => {
                          {top10Results.map((item, idx) => (
                            <tr key={idx} className="border-b hover:bg-gray-50 transition-colors">
                              <td className="py-3 px-4 text-center font-bold">
-                               {idx === 0 ? <span className="text-yellow-500 text-lg">🥇</span> : 
-                                idx === 1 ? <span className="text-gray-400 text-lg">🥈</span> : 
-                                idx === 2 ? <span className="text-orange-400 text-lg">🥉</span> : 
-                                idx + 1}
+                               {idx === 0 ? <span className="text-yellow-500 text-lg">🥇</span> : idx === 1 ? <span className="text-gray-400 text-lg">🥈</span> : idx === 2 ? <span className="text-orange-400 text-lg">🥉</span> : idx + 1}
                              </td>
                              <td className="py-3 px-4 font-medium text-gray-800">{item.媒体名称}</td>
                              <td className="py-3 px-4 text-gray-500 truncate max-w-[250px]" title={item.标题}>{item.标题}</td>
@@ -575,9 +560,7 @@ const App: React.FC = () => {
                 </div>
 
                 <div className="flex justify-center mt-12 mb-8 no-print">
-                  <button onClick={exportToPDF} className="st-button-primary px-10 py-3 rounded-full text-base shadow-lg hover:shadow-xl transform transition-all active:scale-95">
-                    📥 下载项目评分报告 (PDF)
-                  </button>
+                  <button onClick={exportToPDF} className="st-button-primary px-10 py-3 rounded-full text-base shadow-lg hover:shadow-xl transform transition-all active:scale-95">📥 下载评分报告 (PDF)</button>
                 </div>
               </div>
             )}
