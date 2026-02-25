@@ -21,12 +21,7 @@ const App: React.FC = () => {
   const [projectName, setProjectName] = useState("");
   const [projectKeyMessage, setProjectKeyMessage] = useState("");
   const [projectDesc, setProjectDesc] = useState("");
-  const [audienceMode, setAudienceMode] = useState<AudienceMode>(AudienceMode.GENERAL);
-  const [tiers, setTiers] = useState<Tiers>({ 
-    tier1: "", 
-    tier2: "", 
-    tier3: "" 
-  });
+  const [audienceModes, setAudienceModes] = useState<AudienceMode[]>([AudienceMode.GENERAL]);
   
   // --- Sidebar Resize State ---
   const [sidebarWidth, setSidebarWidth] = useState(320);
@@ -54,14 +49,14 @@ const App: React.FC = () => {
     "受众精准度": true,
     "传播质量": true,
     "声量": true,
-    "一句话简评": true,
+    "简评": true,
     "项目总分": false, 
     "真需求": false,
     "获客效能": false,
     "核心信息匹配": false
   });
 
-  const pickableColumns = ["标题", "媒体名称", "媒体分级", "受众精准度", "传播质量", "声量", "一句话简评"];
+  const pickableColumns = ["标题", "媒体名称", "媒体分级", "受众精准度", "传播质量", "声量", "简评"];
 
   const startResizing = useCallback(() => setIsResizing(true), []);
   const stopResizing = useCallback(() => setIsResizing(false), []);
@@ -125,7 +120,7 @@ const App: React.FC = () => {
       const result = await window.mammoth.extractRawText({ arrayBuffer });
       const fullText = result.value;
       if (fullText.trim().length < 10) throw new Error("文档内容过少。");
-      const aiRes = await analyzeWithGemini(fullText, audienceMode, projectKeyMessage, projectDesc, "", true);
+      const aiRes = await analyzeWithGemini(fullText, audienceModes, projectKeyMessage, projectDesc, "", true);
       setWordResult({ ...aiRes, textLen: fullText.length });
     } catch (err: any) {
       setErrorLog(err.message || "分析 Word 文档时出错");
@@ -162,10 +157,14 @@ const App: React.FC = () => {
           const url = row['URL'] || row['链接'] || row['Link'] || "";
           
           const volQuality = calculateVolumeQuality(views, interactions);
-          const tierScore = getMediaTierScore(mediaName);
-          const volTotal = 0.6 * volQuality + 0.4 * tierScore;
           
-          let aiRes: AIAnalysisResult = { km_score: 1, acquisition_score: 1, audience_precision_score: 1, comment: "待评估" };
+          let aiRes: AIAnalysisResult = { 
+            km_score: 1, 
+            acquisition_score: 1, 
+            audience_precision_score: 1, 
+            tier_score: 5,
+            comment: "待评估" 
+          };
           let content = row['正文'] || row['Content'] || row['标题'] || title || "";
           
           if (!content && url && url.startsWith("http")) {
@@ -176,27 +175,32 @@ const App: React.FC = () => {
           if (content || mediaName) {
             try { 
               if (i > 0) await new Promise(res => setTimeout(res, 800));
-              aiRes = await analyzeWithGemini(content, audienceMode, projectKeyMessage, projectDesc, mediaName); 
+              aiRes = await analyzeWithGemini(content, audienceModes, projectKeyMessage, projectDesc, mediaName); 
             } catch (e: any) { aiRes.comment = `AI分析失败: ${e.message}`; }
           }
           
+          const tierScore = aiRes.tier_score || 5;
+          const volTotal = 0.6 * volQuality + 0.4 * tierScore;
           const trueDemand = 0.6 * aiRes.km_score + 0.4 * aiRes.audience_precision_score;
-          const totalScore = (0.5 * trueDemand) + (0.2 * aiRes.acquisition_score) + (0.3 * volTotal);
+          const totalScore = (0.4 * trueDemand) + (0.3 * aiRes.acquisition_score) + (0.3 * volTotal);
           
           results.push({
             "标题": title,
             "媒体名称": mediaName,
-            "项目总分": totalScore.toFixed(2),
-            "真需求": trueDemand.toFixed(2),
+            "项目总分": totalScore.toFixed(1),
+            "真需求": trueDemand.toFixed(1),
             "获客效能": aiRes.acquisition_score,
-            "声量": volTotal.toFixed(2),
+            "声量": volTotal.toFixed(1),
             "核心信息匹配": aiRes.km_score,
             "受众精准度": aiRes.audience_precision_score,
             "媒体分级": tierScore,
             "传播质量": volQuality,
             "评价": aiRes.comment,
-            "一句话简评": aiRes.one_sentence_summary || "",
-            "获客效能简评": aiRes.acquisition_comment || ""
+            "简评": aiRes.one_sentence_summary || "",
+            "获客效能简评": aiRes.acquisition_comment || "",
+            "真需求简评": aiRes.true_demand_comment || "",
+            "声量简评": aiRes.volume_comment || "",
+            "总分简评": aiRes.total_score_comment || ""
           });
           setProgress(Math.round(((i + 1) / totalRows) * 100));
         }
@@ -211,7 +215,7 @@ const App: React.FC = () => {
     const worksheet = window.XLSX.utils.json_to_sheet(batchResults);
     const workbook = window.XLSX.utils.book_new();
     window.XLSX.utils.book_append_sheet(workbook, worksheet, "分析结果");
-    window.XLSX.writeFile(workbook, `${projectName || '肿瘤业务传播分析'}_结果.xlsx`);
+    window.XLSX.writeFile(workbook, `${projectName || '罗氏肿瘤传播分析'}_结果.xlsx`);
   };
 
   const exportToPDF = () => {
@@ -219,7 +223,7 @@ const App: React.FC = () => {
     if (!element) return;
     const opt = {
       margin: 0.5,
-      filename: `${projectName || '肿瘤业务传播分析'}_评分报告.pdf`,
+      filename: `${projectName || '罗氏肿瘤传播分析'}_评分报告.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true },
       jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
@@ -368,23 +372,23 @@ const App: React.FC = () => {
           <input value={projectKeyMessage} onChange={e => setProjectKeyMessage(e.target.value)} className="st-input" />
           <label className="text-xs font-semibold text-gray-600 block mb-1">项目描述 (用于评估获客效能)</label>
           <textarea value={projectDesc} onChange={e => setProjectDesc(e.target.value)} className="st-input h-24 no-scrollbar" />
-          <label className="text-xs font-semibold text-gray-600 block mb-2">目标受众模式</label>
+          <label className="text-xs font-semibold text-gray-600 block mb-2">目标受众模式 (可多选)</label>
           <div className="space-y-1 mb-6">
             {[AudienceMode.GENERAL, AudienceMode.PATIENT, AudienceMode.HCP].map(m => (
               <label key={m} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                <input type="radio" checked={audienceMode === m} onChange={() => setAudienceMode(m)} className="w-4 h-4" />{m}
+                <input 
+                  type="checkbox" 
+                  checked={audienceModes.includes(m)} 
+                  onChange={() => {
+                    if (audienceModes.includes(m)) {
+                      if (audienceModes.length > 1) setAudienceModes(audienceModes.filter(x => x !== m));
+                    } else {
+                      setAudienceModes([...audienceModes, m]);
+                    }
+                  }} 
+                  className="w-4 h-4" 
+                />{m}
               </label>
-            ))}
-          </div>
-          <div className="border-t pt-4">
-            <h3 className="text-sm font-bold mb-1">🏆 媒体分级</h3>
-            {(['tier1', 'tier2', 'tier3'] as Array<keyof Tiers>).map(t => (
-              <div key={t} className="mb-2">
-                <label className="text-[10px] font-bold text-gray-500 block uppercase">
-                  {t === 'tier1' ? 'Tier 1 (10分)' : t === 'tier2' ? 'Tier 2 (8分)' : 'Tier 3 (5分)'}
-                </label>
-                <textarea value={tiers[t]} onChange={e => setTiers({...tiers, [t]: e.target.value})} className="st-input h-16 no-scrollbar text-xs" />
-              </div>
             ))}
           </div>
         </div>
@@ -396,7 +400,7 @@ const App: React.FC = () => {
       <div className={`resize-handle ${isResizing ? 'active' : ''}`} style={{ left: sidebarWidth }} onMouseDown={startResizing} />
 
       <div className="main-content flex-1" style={{ marginLeft: sidebarWidth }}>
-        <h1 className="text-4xl font-bold mb-6">📡 肿瘤业务-传播价值 AI 评分系统</h1>
+        <h1 className="text-4xl font-bold mb-6">📡 罗氏肿瘤领域-传播效能AI评分模型</h1>
         {errorLog && <div className="st-alert st-error shadow-sm"><span>⚠️</span><div><div className="font-bold mb-1">系统错误:</div><div>{errorLog}</div></div></div>}
 
         <div className="st-expander">
@@ -407,9 +411,12 @@ const App: React.FC = () => {
           {isExpanderOpen && (
             <div className="st-expander-content">
               <div className="text-center text-lg leading-loose">
-                <span className="font-bold text-[#1E88E5]">总分</span> = 0.5 × 真需求 + 0.2 × 获客效能 + 0.3 × 声量<br/>
+                <span className="font-bold text-[#1E88E5]">总分</span> = 0.4 × 真需求 + 0.3 × 获客效能 + 0.3 × 声量<br/>
                 <span className="font-bold text-[#1E88E5]">真需求</span> = 0.6 × 信息匹配 + 0.4 × 受众精准度 &nbsp;&nbsp;&nbsp;&nbsp; 
-                <span className="font-bold text-[#1E88E5]">声量</span> = 0.6 × 传播质量 + 0.4 × 媒体分级
+                <span className="font-bold text-[#1E88E5]">声量</span> = 0.6 × 传播质量 + 0.4 × 媒体分级<br/>
+                <div className="mt-4 text-sm text-gray-500 italic">
+                  * 获客效能：获取每个单个客户而投入的总成本效率，即能否高效地吸引潜在客户并转化为付费消费者。
+                </div>
               </div>
             </div>
           )}
@@ -432,9 +439,9 @@ const App: React.FC = () => {
             {wordResult && (
               <div className="mt-8 border-t pt-6 animate-fadeIn">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                  <div className="st-metric"><div className="st-metric-label">信息匹配度</div><div className="st-metric-value">{wordResult.km_score}/10</div></div>
-                  <div className="st-metric"><div className="st-metric-label">目标受众</div><div className="st-metric-value">{wordResult.target_audience_score}/10</div></div>
-                  <div className="st-metric"><div className="st-metric-label">可读性</div><div className="st-metric-value">{wordResult.readability_score}/10</div></div>
+                  <div className="st-metric"><div className="st-metric-label">信息匹配度</div><div className="st-metric-value">{wordResult.km_score.toFixed(1)}/10</div></div>
+                  <div className="st-metric"><div className="st-metric-label">目标受众</div><div className="st-metric-value">{(wordResult.target_audience_score || 0).toFixed(1)}/10</div></div>
+                  <div className="st-metric"><div className="st-metric-label">可读性</div><div className="st-metric-value">{(wordResult.readability_score || 0).toFixed(1)}/10</div></div>
                 </div>
                 <div className="bg-blue-50 border-l-4 border-[#1E88E5] p-4 rounded-r"><h4 className="font-bold text-[#1E88E5] text-sm mb-2">💡 AI 简评</h4><p className="text-sm text-gray-800 leading-relaxed">{wordResult.comment}</p></div>
               </div>
@@ -487,7 +494,7 @@ const App: React.FC = () => {
                         {visibleColumns["受众精准度"] && <th onClick={() => requestSort('受众精准度')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors text-xs">受众精准度</th>}
                         {visibleColumns["传播质量"] && <th onClick={() => requestSort('传播质量')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors text-xs">传播质量</th>}
                         {visibleColumns["声量"] && <th onClick={() => requestSort('声量')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left font-bold cursor-pointer hover:bg-gray-200 transition-colors text-xs">声量</th>}
-                        {visibleColumns["一句话简评"] && <th className="border-b bg-[#f8f9fa] py-3 px-4 text-left text-xs">一句话简评</th>}
+                        {visibleColumns["简评"] && <th className="border-b bg-[#f8f9fa] py-3 px-4 text-left text-xs">简评</th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -495,11 +502,11 @@ const App: React.FC = () => {
                         <tr key={i} className="hover:bg-blue-50/50 transition-colors border-b">
                           {visibleColumns["标题"] && <td className="py-2 px-4 truncate text-[11px]" title={r.标题}>{r.标题}</td>}
                           {visibleColumns["媒体名称"] && <td className="py-2 px-4 truncate text-[11px]">{r.媒体名称}</td>}
-                          {visibleColumns["媒体分级"] && <td className="py-2 px-4 text-[11px]">{r.媒体分级}</td>}
-                          {visibleColumns["受众精准度"] && <td className="py-2 px-4 text-[11px]">{r.受众精准度}</td>}
-                          {visibleColumns["传播质量"] && <td className="py-2 px-4 text-[11px]">{r.传播质量}</td>}
-                          {visibleColumns["声量"] && <td className="py-2 px-4 font-bold text-[#1E88E5] text-[11px]">{r.声量}</td>}
-                          {visibleColumns["一句话简评"] && <td className="py-2 px-4 text-[11px] text-gray-600 italic">{r.一句话简评}</td>}
+                          {visibleColumns["媒体分级"] && <td className="py-2 px-4 text-[11px]">{Number(r.媒体分级).toFixed(1)}/10</td>}
+                          {visibleColumns["受众精准度"] && <td className="py-2 px-4 text-[11px]">{Number(r.受众精准度).toFixed(1)}/10</td>}
+                          {visibleColumns["传播质量"] && <td className="py-2 px-4 text-[11px]">{Number(r.传播质量).toFixed(1)}/10</td>}
+                          {visibleColumns["声量"] && <td className="py-2 px-4 text-[11px]">{Number(r.声量).toFixed(1)}/10</td>}
+                          {visibleColumns["简评"] && <td className="py-2 px-4 text-[11px] text-gray-600 italic">{r.简评}</td>}
                         </tr>
                       ))}
                     </tbody>
@@ -518,18 +525,18 @@ const App: React.FC = () => {
               <div className="space-y-10 w-full overflow-hidden" id="project-report-content">
                 <h3 className="text-xl font-bold">📈 项目评分: {projectName || '未命名项目'}</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                  {[{ l: "项目总分", k: "项目总分" }, { l: "真需求", k: "真需求" }, { l: "获客效能", k: "获客效能" }, { l: "声量", k: "声量" }].map(m => {
+                  {[{ l: "项目总分", k: "项目总分", ck: "总分简评" }, { l: "真需求", k: "真需求", ck: "真需求简评" }, { l: "获客效能", k: "获客效能", ck: "获客效能简评" }, { l: "声量", k: "声量", ck: "声量简评" }].map(m => {
                     const avgVal = batchResults.reduce((a, b) => a + parseFloat(b[m.k as keyof BatchResult] as string || "0"), 0) / batchResults.length;
-                    const isAcquisition = m.l === "获客效能";
+                    const comment = batchResults[0]?.[m.ck as keyof BatchResult] as string;
                     return (
-                      <div key={m.l} className={`st-metric shadow-sm border border-blue-50 flex flex-col ${isAcquisition ? 'col-span-1 md:col-span-1' : ''}`}>
+                      <div key={m.l} className="st-metric shadow-sm border border-blue-50 flex flex-col">
                         <div className="st-metric-label">{m.l}</div>
                         <div className="flex items-baseline gap-2">
-                          <div className="st-metric-value">{avgVal.toFixed(2)}</div>
+                          <div className="st-metric-value">{avgVal.toFixed(1)}/10</div>
                         </div>
-                        {isAcquisition && batchResults[0]?.获客效能简评 && (
+                        {comment && (
                           <div className="mt-2 pt-2 border-t border-blue-100 text-[10px] text-blue-600 italic leading-tight">
-                            AI 简评: {batchResults[0].获客效能简评}
+                            AI 简评: {comment}
                           </div>
                         )}
                       </div>

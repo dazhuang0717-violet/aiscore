@@ -9,10 +9,14 @@ export interface AIAnalysisResult {
   km_score: number;
   acquisition_score: number;
   audience_precision_score: number;
+  tier_score?: number;            // AI 判定的媒体分级
   target_audience_score?: number; // 目标受众评分 (仅新闻稿)
   readability_score?: number;     // 可读性评分 (仅新闻稿)
-  one_sentence_summary?: string;  // 一句话简评
+  one_sentence_summary?: string;  // 简评
   acquisition_comment?: string;   // 获客效能专项简评
+  true_demand_comment?: string;   // 真需求专项简评
+  volume_comment?: string;        // 声量专项简评
+  total_score_comment?: string;   // 总分专项简评
   comment: string;
 }
 
@@ -32,8 +36,11 @@ export interface BatchResult {
   媒体分级: number;
   传播质量: number;
   评价: string;
-  一句话简评: string;
+  简评: string;
   获客效能简评: string;
+  真需求简评: string;
+  声量简评: string;
+  总分简评: string;
 }
 
 export enum AudienceMode {
