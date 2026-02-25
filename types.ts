@@ -12,6 +12,7 @@ export interface AIAnalysisResult {
   target_audience_score?: number; // 目标受众评分 (仅新闻稿)
   readability_score?: number;     // 可读性评分 (仅新闻稿)
   one_sentence_summary?: string;  // 一句话简评
+  acquisition_comment?: string;   // 获客效能专项简评
   comment: string;
 }
 
@@ -32,6 +33,7 @@ export interface BatchResult {
   传播质量: number;
   评价: string;
   一句话简评: string;
+  获客效能简评: string;
 }
 
 export enum AudienceMode {

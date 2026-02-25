@@ -195,7 +195,8 @@ const App: React.FC = () => {
             "媒体分级": tierScore,
             "传播质量": volQuality,
             "评价": aiRes.comment,
-            "一句话简评": aiRes.one_sentence_summary || ""
+            "一句话简评": aiRes.one_sentence_summary || "",
+            "获客效能简评": aiRes.acquisition_comment || ""
           });
           setProgress(Math.round(((i + 1) / totalRows) * 100));
         }
@@ -519,10 +520,18 @@ const App: React.FC = () => {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                   {[{ l: "项目总分", k: "项目总分" }, { l: "真需求", k: "真需求" }, { l: "获客效能", k: "获客效能" }, { l: "声量", k: "声量" }].map(m => {
                     const avgVal = batchResults.reduce((a, b) => a + parseFloat(b[m.k as keyof BatchResult] as string || "0"), 0) / batchResults.length;
+                    const isAcquisition = m.l === "获客效能";
                     return (
-                      <div key={m.l} className="st-metric shadow-sm border border-blue-50">
+                      <div key={m.l} className={`st-metric shadow-sm border border-blue-50 flex flex-col ${isAcquisition ? 'col-span-1 md:col-span-1' : ''}`}>
                         <div className="st-metric-label">{m.l}</div>
-                        <div className="st-metric-value">{avgVal.toFixed(2)}</div>
+                        <div className="flex items-baseline gap-2">
+                          <div className="st-metric-value">{avgVal.toFixed(2)}</div>
+                        </div>
+                        {isAcquisition && batchResults[0]?.获客效能简评 && (
+                          <div className="mt-2 pt-2 border-t border-blue-100 text-[10px] text-blue-600 italic leading-tight">
+                            AI 简评: {batchResults[0].获客效能简评}
+                          </div>
+                        )}
                       </div>
                     );
                   })}

@@ -48,10 +48,11 @@ ${content.substring(0, 5000)}`;
     acquisition_score: { type: Type.NUMBER, description: "获客效能得分 (1-10)，评估获取单个客户的投入总成本效率及转化潜力" },
     audience_precision_score: { type: Type.NUMBER, description: "受众精准度得分 (1-10)，依据媒体名称评估" },
     one_sentence_summary: { type: Type.STRING, description: "一句话简评 (20字以内)" },
+    acquisition_comment: { type: Type.STRING, description: "针对获客效能设计的专项简评 (30字以内)" },
     comment: { type: Type.STRING, description: "专业且详细的评分意见" },
   };
 
-  const required = ["km_score", "acquisition_score", "audience_precision_score", "one_sentence_summary", "comment"];
+  const required = ["km_score", "acquisition_score", "audience_precision_score", "one_sentence_summary", "acquisition_comment", "comment"];
 
   if (isNewsRelease) {
     properties.target_audience_score = { type: Type.NUMBER, description: "目标受众得分 (1-10)" };
