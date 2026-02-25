@@ -98,13 +98,13 @@ const App: React.FC = () => {
   };
 
   const getMediaTierScore = (mediaName: string): number => {
-    if (!mediaName) return 3;
+    if (!mediaName) return 5;
     const mName = String(mediaName).toLowerCase().trim();
     const parse = (t: string) => t.split(/[,，]/).map(x => x.trim().toLowerCase()).filter(x => x);
     if (parse(tiers.tier1).some(m => mName.includes(m))) return 10;
     if (parse(tiers.tier2).some(m => mName.includes(m))) return 8;
     if (parse(tiers.tier3).some(m => mName.includes(m))) return 5;
-    return 3;
+    return 5;
   };
 
   const fetchUrlContent = async (url: string): Promise<string | null> => {
@@ -365,7 +365,7 @@ const App: React.FC = () => {
           <input value={projectName} onChange={e => setProjectName(e.target.value)} className="st-input" />
           <label className="text-xs font-semibold text-gray-600 block mb-1">核心信息 (Key Message)</label>
           <input value={projectKeyMessage} onChange={e => setProjectKeyMessage(e.target.value)} className="st-input" />
-          <label className="text-xs font-semibold text-gray-600 block mb-1">项目描述 (用于评估获客逻辑)</label>
+          <label className="text-xs font-semibold text-gray-600 block mb-1">项目描述 (用于评估获客效能)</label>
           <textarea value={projectDesc} onChange={e => setProjectDesc(e.target.value)} className="st-input h-24 no-scrollbar" />
           <label className="text-xs font-semibold text-gray-600 block mb-2">目标受众模式</label>
           <div className="space-y-1 mb-6">
