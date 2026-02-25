@@ -54,13 +54,14 @@ const App: React.FC = () => {
     "受众精准度": true,
     "传播质量": true,
     "声量": true,
+    "一句话简评": true,
     "项目总分": false, 
     "真需求": false,
     "获客效能": false,
     "核心信息匹配": false
   });
 
-  const pickableColumns = ["标题", "媒体名称", "媒体分级", "受众精准度", "传播质量", "声量"];
+  const pickableColumns = ["标题", "媒体名称", "媒体分级", "受众精准度", "传播质量", "声量", "一句话简评"];
 
   const startResizing = useCallback(() => setIsResizing(true), []);
   const stopResizing = useCallback(() => setIsResizing(false), []);
@@ -124,7 +125,7 @@ const App: React.FC = () => {
       const result = await window.mammoth.extractRawText({ arrayBuffer });
       const fullText = result.value;
       if (fullText.trim().length < 10) throw new Error("文档内容过少。");
-      const aiRes = await analyzeWithGemini(fullText, audienceMode, projectKeyMessage, projectDesc, "内部稿件");
+      const aiRes = await analyzeWithGemini(fullText, audienceMode, projectKeyMessage, projectDesc, "", true);
       setWordResult({ ...aiRes, textLen: fullText.length });
     } catch (err: any) {
       setErrorLog(err.message || "分析 Word 文档时出错");
@@ -193,7 +194,8 @@ const App: React.FC = () => {
             "受众精准度": aiRes.audience_precision_score,
             "媒体分级": tierScore,
             "传播质量": volQuality,
-            "评价": aiRes.comment
+            "评价": aiRes.comment,
+            "一句话简评": aiRes.one_sentence_summary || ""
           });
           setProgress(Math.round(((i + 1) / totalRows) * 100));
         }
@@ -428,7 +430,11 @@ const App: React.FC = () => {
             {isProcessing && <div className="text-blue-600 font-bold mb-4 flex items-center gap-2 animate-pulse">⏳ AI 正在深度阅读文档...</div>}
             {wordResult && (
               <div className="mt-8 border-t pt-6 animate-fadeIn">
-                <div className="st-metric max-w-xs mb-6"><div className="st-metric-label">信息匹配度</div><div className="st-metric-value">{wordResult.km_score}/10</div></div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="st-metric"><div className="st-metric-label">信息匹配度</div><div className="st-metric-value">{wordResult.km_score}/10</div></div>
+                  <div className="st-metric"><div className="st-metric-label">目标受众</div><div className="st-metric-value">{wordResult.target_audience_score}/10</div></div>
+                  <div className="st-metric"><div className="st-metric-label">可读性</div><div className="st-metric-value">{wordResult.readability_score}/10</div></div>
+                </div>
                 <div className="bg-blue-50 border-l-4 border-[#1E88E5] p-4 rounded-r"><h4 className="font-bold text-[#1E88E5] text-sm mb-2">💡 AI 简评</h4><p className="text-sm text-gray-800 leading-relaxed">{wordResult.comment}</p></div>
               </div>
             )}
@@ -480,6 +486,7 @@ const App: React.FC = () => {
                         {visibleColumns["受众精准度"] && <th onClick={() => requestSort('受众精准度')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors text-xs">受众精准度</th>}
                         {visibleColumns["传播质量"] && <th onClick={() => requestSort('传播质量')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors text-xs">传播质量</th>}
                         {visibleColumns["声量"] && <th onClick={() => requestSort('声量')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left font-bold cursor-pointer hover:bg-gray-200 transition-colors text-xs">声量</th>}
+                        {visibleColumns["一句话简评"] && <th className="border-b bg-[#f8f9fa] py-3 px-4 text-left text-xs">一句话简评</th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -491,6 +498,7 @@ const App: React.FC = () => {
                           {visibleColumns["受众精准度"] && <td className="py-2 px-4 text-[11px]">{r.受众精准度}</td>}
                           {visibleColumns["传播质量"] && <td className="py-2 px-4 text-[11px]">{r.传播质量}</td>}
                           {visibleColumns["声量"] && <td className="py-2 px-4 font-bold text-[#1E88E5] text-[11px]">{r.声量}</td>}
+                          {visibleColumns["一句话简评"] && <td className="py-2 px-4 text-[11px] text-gray-600 italic">{r.一句话简评}</td>}
                         </tr>
                       ))}
                     </tbody>

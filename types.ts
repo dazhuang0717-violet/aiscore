@@ -9,6 +9,9 @@ export interface AIAnalysisResult {
   km_score: number;
   acquisition_score: number;
   audience_precision_score: number;
+  target_audience_score?: number; // 目标受众评分 (仅新闻稿)
+  readability_score?: number;     // 可读性评分 (仅新闻稿)
+  one_sentence_summary?: string;  // 一句话简评
   comment: string;
 }
 
@@ -28,6 +31,7 @@ export interface BatchResult {
   媒体分级: number;
   传播质量: number;
   评价: string;
+  一句话简评: string;
 }
 
 export enum AudienceMode {
