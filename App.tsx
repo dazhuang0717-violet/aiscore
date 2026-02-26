@@ -58,6 +58,12 @@ const App: React.FC = () => {
     "核心信息匹配": false
   });
 
+  const tiers: Tiers = {
+    tier1: "人民日报,新华社,央视,丁香园,医脉通,健康报",
+    tier2: "腾讯,新浪,网易,搜狐,凤凰,澎湃,第一财经",
+    tier3: "地方媒体,行业小报,其他"
+  };
+
   const pickableColumns = ["标题", "媒体名称", "媒体分级", "受众精准度", "传播质量", "声量", "简评"];
 
   const startResizing = useCallback(() => setIsResizing(true), []);
