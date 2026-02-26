@@ -376,7 +376,7 @@ const App: React.FC = () => {
           <label className="text-xs font-semibold text-gray-600 block mb-1">核心信息 (Key Message)</label>
           <input value={projectKeyMessage} onChange={e => setProjectKeyMessage(e.target.value)} className="st-input" />
           <label className="text-xs font-semibold text-gray-600 block mb-1">项目描述 (用于评估获客效能)</label>
-          <textarea value={projectDesc} onChange={e => setProjectDesc(e.target.value)} className="st-input h-96 no-scrollbar" />
+          <textarea value={projectDesc} onChange={e => setProjectDesc(e.target.value)} className="st-input h-80 no-scrollbar" />
           <label className="text-xs font-semibold text-gray-600 block mb-2">目标受众模式 (可多选)</label>
           <div className="space-y-1 mb-6">
             {[AudienceMode.GENERAL, AudienceMode.PATIENT, AudienceMode.HCP].map(m => (
