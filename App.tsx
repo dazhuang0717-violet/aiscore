@@ -509,7 +509,7 @@ const App: React.FC = () => {
                         {visibleColumns["媒体分级"] && <th onClick={() => requestSort('媒体分级')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors text-xs">媒体分级</th>}
                         {visibleColumns["受众精准度"] && <th onClick={() => requestSort('受众精准度')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors text-xs">受众精准度</th>}
                         {visibleColumns["传播质量"] && <th onClick={() => requestSort('传播质量')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors text-xs">传播质量</th>}
-                        {visibleColumns["声量"] && <th onClick={() => requestSort('声量')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left font-bold cursor-pointer hover:bg-gray-200 transition-colors text-xs">声量</th>}
+                        {visibleColumns["声量"] && <th onClick={() => requestSort('声量')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left font-bold cursor-pointer hover:bg-gray-200 transition-colors text-xs text-[#1E88E5]">声量</th>}
                         {visibleColumns["简评"] && <th className="border-b bg-[#f8f9fa] py-3 px-4 text-left text-xs">简评</th>}
                       </tr>
                     </thead>
@@ -521,7 +521,7 @@ const App: React.FC = () => {
                           {visibleColumns["媒体分级"] && <td className="py-2 px-4 text-[11px]">{Number(r.媒体分级).toFixed(1)}/10</td>}
                           {visibleColumns["受众精准度"] && <td className="py-2 px-4 text-[11px]">{Number(r.受众精准度).toFixed(1)}/10</td>}
                           {visibleColumns["传播质量"] && <td className="py-2 px-4 text-[11px]">{Number(r.传播质量).toFixed(1)}/10</td>}
-                          {visibleColumns["声量"] && <td className="py-2 px-4 text-[11px]">{Number(r.声量).toFixed(1)}/10</td>}
+                          {visibleColumns["声量"] && <td className="py-2 px-4 text-[11px] font-bold text-[#1E88E5]">{Number(r.声量).toFixed(1)}/10</td>}
                           {visibleColumns["简评"] && <td className="py-2 px-4 text-[11px] text-gray-600 italic">{r.简评}</td>}
                         </tr>
                       ))}
