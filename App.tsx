@@ -408,7 +408,7 @@ const App: React.FC = () => {
         <button className="mobile-toggle" onClick={() => setIsMobileSidebarOpen(true)}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
         </button>
-        <h1 className="text-2xl md:text-4xl font-bold mb-6">📡 罗氏肿瘤领域-传播效能AI评分模型</h1>
+        <h1 className="text-lg sm:text-2xl md:text-4xl font-bold mb-6 whitespace-nowrap overflow-hidden text-ellipsis">📡 罗氏肿瘤领域-传播效能AI评分模型</h1>
         {errorLog && <div className="st-alert st-error shadow-sm"><span>⚠️</span><div><div className="font-bold mb-1">系统错误:</div><div>{errorLog}</div></div></div>}
 
         <div className="st-expander">
