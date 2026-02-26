@@ -182,7 +182,7 @@ const App: React.FC = () => {
           const tierScore = aiRes.tier_score || 5;
           const volTotal = 0.6 * volQuality + 0.4 * tierScore;
           const trueDemand = 0.6 * aiRes.km_score + 0.4 * aiRes.audience_precision_score;
-          const totalScore = (0.4 * trueDemand) + (0.3 * aiRes.acquisition_score) + (0.3 * volTotal);
+          const totalScore = (0.5 * trueDemand) + (0.2 * aiRes.acquisition_score) + (0.3 * volTotal);
           
           results.push({
             "标题": title,
@@ -411,7 +411,7 @@ const App: React.FC = () => {
           {isExpanderOpen && (
             <div className="st-expander-content">
               <div className="text-center text-lg leading-loose">
-                <span className="font-bold text-[#1E88E5]">总分</span> = 0.4 × 真需求 + 0.3 × 获客效能 + 0.3 × 声量<br/>
+                <span className="font-bold text-[#1E88E5]">总分</span> = 0.5 × 真需求 + 0.2 × 获客效能 + 0.3 × 声量<br/>
                 <span className="font-bold text-[#1E88E5]">真需求</span> = 0.6 × 信息匹配 + 0.4 × 受众精准度 &nbsp;&nbsp;&nbsp;&nbsp; 
                 <span className="font-bold text-[#1E88E5]">声量</span> = 0.6 × 传播质量 + 0.4 × 媒体分级<br/>
                 <div className="mt-4 text-sm text-gray-500 italic">
