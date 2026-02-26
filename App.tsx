@@ -23,6 +23,8 @@ const App: React.FC = () => {
   const [projectDesc, setProjectDesc] = useState("");
   const [audienceModes, setAudienceModes] = useState<AudienceMode[]>([AudienceMode.GENERAL]);
   
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  
   // --- Sidebar Resize State ---
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [isResizing, setIsResizing] = useState(false);
@@ -362,16 +364,19 @@ const App: React.FC = () => {
   return (
     <div className="flex">
       {/* --- Sidebar --- */}
-      <div className="st-sidebar no-scrollbar flex flex-col" style={{ width: sidebarWidth }}>
+      <div className={`st-sidebar no-scrollbar flex flex-col ${isMobileSidebarOpen ? 'open' : ''}`} style={{ width: sidebarWidth }}>
         <div className="flex-1">
-          <h2 className="text-lg font-bold mb-4">⚙️ 规则配置</h2>
+          <div className="flex justify-between items-center md:block mb-4">
+            <h2 className="text-lg font-bold">⚙️ 规则配置</h2>
+            <button onClick={() => setIsMobileSidebarOpen(false)} className="md:hidden text-gray-500">✕</button>
+          </div>
           <h3 className="text-sm font-bold mt-6 mb-2">📋 项目信息</h3>
           <label className="text-xs font-semibold text-gray-600 block mb-1">项目名称</label>
           <input value={projectName} onChange={e => setProjectName(e.target.value)} className="st-input" />
           <label className="text-xs font-semibold text-gray-600 block mb-1">核心信息 (Key Message)</label>
           <input value={projectKeyMessage} onChange={e => setProjectKeyMessage(e.target.value)} className="st-input" />
           <label className="text-xs font-semibold text-gray-600 block mb-1">项目描述 (用于评估获客效能)</label>
-          <textarea value={projectDesc} onChange={e => setProjectDesc(e.target.value)} className="st-input h-64 no-scrollbar" />
+          <textarea value={projectDesc} onChange={e => setProjectDesc(e.target.value)} className="st-input h-96 no-scrollbar" />
           <label className="text-xs font-semibold text-gray-600 block mb-2">目标受众模式 (可多选)</label>
           <div className="space-y-1 mb-6">
             {[AudienceMode.GENERAL, AudienceMode.PATIENT, AudienceMode.HCP].map(m => (
@@ -400,7 +405,10 @@ const App: React.FC = () => {
       <div className={`resize-handle ${isResizing ? 'active' : ''}`} style={{ left: sidebarWidth }} onMouseDown={startResizing} />
 
       <div className="main-content flex-1" style={{ marginLeft: sidebarWidth }}>
-        <h1 className="text-4xl font-bold mb-6">📡 罗氏肿瘤领域-传播效能AI评分模型</h1>
+        <button className="mobile-toggle" onClick={() => setIsMobileSidebarOpen(true)}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+        </button>
+        <h1 className="text-2xl md:text-4xl font-bold mb-6">📡 罗氏肿瘤领域-传播效能AI评分模型</h1>
         {errorLog && <div className="st-alert st-error shadow-sm"><span>⚠️</span><div><div className="font-bold mb-1">系统错误:</div><div>{errorLog}</div></div></div>}
 
         <div className="st-expander">
