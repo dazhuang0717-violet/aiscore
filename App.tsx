@@ -418,11 +418,13 @@ const App: React.FC = () => {
           </div>
           {isExpanderOpen && (
             <div className="st-expander-content">
-              <div className="text-center text-lg leading-loose">
-                <span className="font-bold text-[#1E88E5]">总分</span> = 0.5 × 真需求 + 0.2 × 获客效能 + 0.3 × 声量<br/>
-                <span className="font-bold text-[#1E88E5]">真需求</span> = 0.6 × 信息匹配 + 0.4 × 受众精准度 &nbsp;&nbsp;&nbsp;&nbsp; 
-                <span className="font-bold text-[#1E88E5]">声量</span> = 0.6 × 传播质量 + 0.4 × 媒体分级<br/>
-                <div className="mt-4 text-sm text-gray-500 italic">
+              <div className="text-center text-sm md:text-lg leading-loose flex flex-col gap-2">
+                <div><span className="font-bold text-[#1E88E5]">总分</span> = 0.5 × 真需求 + 0.2 × 获客效能 + 0.3 × 声量</div>
+                <div className="flex flex-col md:flex-row justify-center md:gap-8">
+                  <div><span className="font-bold text-[#1E88E5]">真需求</span> = 0.6 × 信息匹配 + 0.4 × 受众精准度</div>
+                  <div><span className="font-bold text-[#1E88E5]">声量</span> = 0.6 × 传播质量 + 0.4 × 媒体分级</div>
+                </div>
+                <div className="mt-4 text-xs md:text-sm text-gray-500 italic">
                   * 获客效能：获取每个单个客户而投入的总成本效率，即能否高效地吸引潜在客户并转化为付费消费者。
                 </div>
               </div>
