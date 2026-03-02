@@ -502,38 +502,39 @@ const App: React.FC = () => {
                   </div>
                 </div>
                 <div className="overflow-auto max-h-[600px] border border-gray-200 rounded-lg shadow-sm no-scrollbar">
-                  <table className="border-separate border-spacing-0 w-full table-fixed">
+                  <table className="border-separate border-spacing-0 w-full min-w-[800px] table-fixed">
                     <thead className="sticky top-0 z-10 shadow-sm">
                       <tr>
-                        {visibleColumns["标题"] && <th onClick={() => requestSort('标题')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors text-xs">标题</th>}
-                        {visibleColumns["媒体名称"] && <th onClick={() => requestSort('媒体名称')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors text-xs">媒体名称</th>}
-                        {visibleColumns["媒体分级"] && <th onClick={() => requestSort('媒体分级')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors text-xs">媒体分级</th>}
-                        {visibleColumns["受众精准度"] && <th onClick={() => requestSort('受众精准度')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors text-xs">受众精准度</th>}
-                        {visibleColumns["传播质量"] && <th onClick={() => requestSort('传播质量')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors text-xs">传播质量</th>}
-                        {visibleColumns["声量"] && <th onClick={() => requestSort('声量')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left font-bold cursor-pointer hover:bg-gray-200 transition-colors text-xs text-[#1E88E5]">声量</th>}
-                        {visibleColumns["简评"] && <th className="border-b bg-[#f8f9fa] py-3 px-4 text-left text-xs">简评</th>}
+                        {visibleColumns["标题"] && <th onClick={() => requestSort('标题')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors text-xs w-[12%]">标题</th>}
+                        {visibleColumns["媒体名称"] && <th onClick={() => requestSort('媒体名称')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors text-xs w-[12%]">媒体名称</th>}
+                        {visibleColumns["媒体分级"] && <th onClick={() => requestSort('媒体分级')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors text-xs w-[10%]">媒体分级</th>}
+                        {visibleColumns["受众精准度"] && <th onClick={() => requestSort('受众精准度')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors text-xs w-[10%]">受众精准度</th>}
+                        {visibleColumns["传播质量"] && <th onClick={() => requestSort('传播质量')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors text-xs w-[10%]">传播质量</th>}
+                        {visibleColumns["声量"] && <th onClick={() => requestSort('声量')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left font-bold cursor-pointer hover:bg-gray-200 transition-colors text-xs text-[#1E88E5] w-[10%]">声量</th>}
+                        {visibleColumns["简评"] && <th className="border-b bg-[#f8f9fa] py-3 px-4 text-left text-xs w-[36%]">简评</th>}
                       </tr>
                     </thead>
                     <tbody>
                       {["网站", "APP", "微信", "社交媒体"].map(category => {
                         const categoryResults = sortedResults?.filter(r => r.媒体类型 === category);
                         if (!categoryResults || categoryResults.length === 0) return null;
+                        const colCount = pickableColumns.filter(c => visibleColumns[c]).length;
                         return (
                           <React.Fragment key={category}>
                             <tr className="bg-gray-50/80">
-                              <td colSpan={10} className="py-2 px-4 font-bold text-gray-500 text-[10px] uppercase tracking-wider border-b">
+                              <td colSpan={colCount} className="py-2 px-4 font-bold text-gray-500 text-[10px] uppercase tracking-wider border-b">
                                 📁 {category}
                               </td>
                             </tr>
                             {categoryResults.map((r, i) => (
                               <tr key={`${category}-${i}`} className="hover:bg-blue-50/50 transition-colors border-b">
-                                {visibleColumns["标题"] && <td className="py-2 px-4 truncate text-[11px]" title={r.标题}>{r.标题}</td>}
-                                {visibleColumns["媒体名称"] && <td className="py-2 px-4 truncate text-[11px]">{r.媒体名称}</td>}
-                                {visibleColumns["媒体分级"] && <td className="py-2 px-4 text-[11px]">{Number(r.媒体分级).toFixed(1)}/10</td>}
-                                {visibleColumns["受众精准度"] && <td className="py-2 px-4 text-[11px]">{Number(r.受众精准度).toFixed(1)}/10</td>}
-                                {visibleColumns["传播质量"] && <td className="py-2 px-4 text-[11px]">{Number(r.传播质量).toFixed(1)}/10</td>}
-                                {visibleColumns["声量"] && <td className="py-2 px-4 text-[11px] font-bold text-[#1E88E5]">{Number(r.声量).toFixed(1)}/10</td>}
-                                {visibleColumns["简评"] && <td className="py-2 px-4 text-[11px] text-gray-600 italic">{r.简评}</td>}
+                                {visibleColumns["标题"] && <td className="py-2 px-4 truncate text-[11px] w-[12%]" title={r.标题}>{r.标题}</td>}
+                                {visibleColumns["媒体名称"] && <td className="py-2 px-4 truncate text-[11px] w-[12%]">{r.媒体名称}</td>}
+                                {visibleColumns["媒体分级"] && <td className="py-2 px-4 text-[11px] w-[10%]">{Number(r.媒体分级).toFixed(1)}/10</td>}
+                                {visibleColumns["受众精准度"] && <td className="py-2 px-4 text-[11px] w-[10%]">{Number(r.受众精准度).toFixed(1)}/10</td>}
+                                {visibleColumns["传播质量"] && <td className="py-2 px-4 text-[11px] w-[10%]">{Number(r.传播质量).toFixed(1)}/10</td>}
+                                {visibleColumns["声量"] && <td className="py-2 px-4 text-[11px] font-bold text-[#1E88E5] w-[10%]">{Number(r.声量).toFixed(1)}/10</td>}
+                                {visibleColumns["简评"] && <td className="py-2 px-4 text-[11px] text-gray-600 italic w-[36%] leading-relaxed whitespace-normal">{r.简评}</td>}
                               </tr>
                             ))}
                           </React.Fragment>
@@ -543,22 +544,23 @@ const App: React.FC = () => {
                       {(() => {
                         const otherResults = sortedResults?.filter(r => !["网站", "APP", "微信", "社交媒体"].includes(r.媒体类型));
                         if (!otherResults || otherResults.length === 0) return null;
+                        const colCount = pickableColumns.filter(c => visibleColumns[c]).length;
                         return (
                           <React.Fragment key="其他">
                             <tr className="bg-gray-50/80">
-                              <td colSpan={10} className="py-2 px-4 font-bold text-gray-500 text-[10px] uppercase tracking-wider border-b">
+                              <td colSpan={colCount} className="py-2 px-4 font-bold text-gray-500 text-[10px] uppercase tracking-wider border-b">
                                 📁 其他
                               </td>
                             </tr>
                             {otherResults.map((r, i) => (
                               <tr key={`other-${i}`} className="hover:bg-blue-50/50 transition-colors border-b">
-                                {visibleColumns["标题"] && <td className="py-2 px-4 truncate text-[11px]" title={r.标题}>{r.标题}</td>}
-                                {visibleColumns["媒体名称"] && <td className="py-2 px-4 truncate text-[11px]">{r.媒体名称}</td>}
-                                {visibleColumns["媒体分级"] && <td className="py-2 px-4 text-[11px]">{Number(r.媒体分级).toFixed(1)}/10</td>}
-                                {visibleColumns["受众精准度"] && <td className="py-2 px-4 text-[11px]">{Number(r.受众精准度).toFixed(1)}/10</td>}
-                                {visibleColumns["传播质量"] && <td className="py-2 px-4 text-[11px]">{Number(r.传播质量).toFixed(1)}/10</td>}
-                                {visibleColumns["声量"] && <td className="py-2 px-4 text-[11px] font-bold text-[#1E88E5]">{Number(r.声量).toFixed(1)}/10</td>}
-                                {visibleColumns["简评"] && <td className="py-2 px-4 text-[11px] text-gray-600 italic">{r.简评}</td>}
+                                {visibleColumns["标题"] && <td className="py-2 px-4 truncate text-[11px] w-[12%]" title={r.标题}>{r.标题}</td>}
+                                {visibleColumns["媒体名称"] && <td className="py-2 px-4 truncate text-[11px] w-[12%]">{r.媒体名称}</td>}
+                                {visibleColumns["媒体分级"] && <td className="py-2 px-4 text-[11px] w-[10%]">{Number(r.媒体分级).toFixed(1)}/10</td>}
+                                {visibleColumns["受众精准度"] && <td className="py-2 px-4 text-[11px] w-[10%]">{Number(r.受众精准度).toFixed(1)}/10</td>}
+                                {visibleColumns["传播质量"] && <td className="py-2 px-4 text-[11px] w-[10%]">{Number(r.传播质量).toFixed(1)}/10</td>}
+                                {visibleColumns["声量"] && <td className="py-2 px-4 text-[11px] font-bold text-[#1E88E5] w-[10%]">{Number(r.声量).toFixed(1)}/10</td>}
+                                {visibleColumns["简评"] && <td className="py-2 px-4 text-[11px] text-gray-600 italic w-[36%] leading-relaxed whitespace-normal">{r.简评}</td>}
                               </tr>
                             ))}
                           </React.Fragment>

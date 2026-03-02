@@ -35,6 +35,10 @@ export const analyzeWithGemini = async (
     - 8分：较好的门户网站（如腾讯、新浪新闻）和主流媒体。
     - 5分：广泛的大众媒体或区域性媒体。
 
+已知媒体参考：
+- 医脉通肿瘤：微信公众号，主要针对医疗专业人士 (HCP)，属于 Tier 1 (10分)。
+- 乳腺癌互助：微信公众号，主要针对患者 (Patient)，属于 Tier 1 (10分)。
+
 （3）获客效能：由AI分析 [项目描述]，评估其获取每个单个客户而投入的总成本效率，即能否高效地吸引潜在客户并转化为付费消费者。请评估项目通过不同市场策略和渠道吸引潜在客户并将其转化为实际消费者的逻辑潜力。该分数应完全取决于项目本身的获客设计。`;
 
   if (isNewsRelease) {
@@ -62,12 +66,12 @@ ${content.substring(0, 5000)}`;
     audience_precision_score: { type: Type.NUMBER, description: "受众精准度得分 (1-10)，依据媒体名称评估" },
     tier_score: { type: Type.NUMBER, description: "媒体分级得分 (5, 8, 或 10)" },
     media_category: { type: Type.STRING, description: "媒体类型，必须从以下选项中选择：'网站', 'APP', '微信', '社交媒体'" },
-    one_sentence_summary: { type: Type.STRING, description: "简评 (50字以内)，必须包含该内容的优点和缺点，格式如：优点：...；缺点：..." },
-    acquisition_comment: { type: Type.STRING, description: "针对获客效能设计的专项简评 (30字以内)" },
-    true_demand_comment: { type: Type.STRING, description: "针对真需求（信息匹配+受众精准）的专项简评 (30字以内)" },
-    volume_comment: { type: Type.STRING, description: "针对声量（传播质量+媒体分级）的专项简评 (30字以内)" },
-    total_score_comment: { type: Type.STRING, description: "针对项目总分的综合简评 (30字以内)" },
-    comment: { type: Type.STRING, description: "专业且详细的评分意见，必须包含该内容的优点和缺点" },
+    one_sentence_summary: { type: Type.STRING, description: "简评 (100字以内)，必须包含该内容的优点和缺点，不要使用'优点：'或'缺点：'字样，直接描述内容并用分号分隔。" },
+    acquisition_comment: { type: Type.STRING, description: "针对获客效能设计的专项简评 (100字以内)，需包含优缺点，不使用'优点：'或'缺点：'字样，直接描述并用分号分隔。" },
+    true_demand_comment: { type: Type.STRING, description: "针对真需求（信息匹配+受众精准）的专项简评 (100字以内)，需包含优缺点，不使用'优点：'或'缺点：'字样，直接描述并用分号分隔。" },
+    volume_comment: { type: Type.STRING, description: "针对声量（传播质量+媒体分级）的专项简评 (100字以内)，需包含优缺点，不使用'优点：'或'缺点：'字样，直接描述并用分号分隔。" },
+    total_score_comment: { type: Type.STRING, description: "针对项目总分的综合简评 (100字以内)，需包含优缺点，不使用'优点：'或'缺点：'字样，直接描述并用分号分隔。" },
+    comment: { type: Type.STRING, description: "专业且详细的评分意见，必须包含该内容的优点和缺点，不要使用'优点：'或'缺点：'字样。" },
   };
 
   const required = [
