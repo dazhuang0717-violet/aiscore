@@ -17,6 +17,7 @@ export interface AIAnalysisResult {
   true_demand_comment?: string;   // 真需求专项简评
   volume_comment?: string;        // 声量专项简评
   total_score_comment?: string;   // 总分专项简评
+  media_category?: string;        // 媒体类型 (网站, APP, 微信, 社交媒体)
   comment: string;
 }
 
@@ -27,6 +28,7 @@ export interface WordResult extends AIAnalysisResult {
 export interface BatchResult {
   标题: string;
   媒体名称: string;
+  媒体类型: string;
   项目总分: string;
   真需求: string;
   获客效能: number;

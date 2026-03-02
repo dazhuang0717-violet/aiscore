@@ -195,6 +195,7 @@ const App: React.FC = () => {
           results.push({
             "标题": title,
             "媒体名称": mediaName,
+            "媒体类型": aiRes.media_category || "网站",
             "项目总分": totalScore.toFixed(1),
             "真需求": trueDemand.toFixed(1),
             "获客效能": aiRes.acquisition_score,
@@ -514,17 +515,55 @@ const App: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {sortedResults?.map((r, i) => (
-                        <tr key={i} className="hover:bg-blue-50/50 transition-colors border-b">
-                          {visibleColumns["标题"] && <td className="py-2 px-4 truncate text-[11px]" title={r.标题}>{r.标题}</td>}
-                          {visibleColumns["媒体名称"] && <td className="py-2 px-4 truncate text-[11px]">{r.媒体名称}</td>}
-                          {visibleColumns["媒体分级"] && <td className="py-2 px-4 text-[11px]">{Number(r.媒体分级).toFixed(1)}/10</td>}
-                          {visibleColumns["受众精准度"] && <td className="py-2 px-4 text-[11px]">{Number(r.受众精准度).toFixed(1)}/10</td>}
-                          {visibleColumns["传播质量"] && <td className="py-2 px-4 text-[11px]">{Number(r.传播质量).toFixed(1)}/10</td>}
-                          {visibleColumns["声量"] && <td className="py-2 px-4 text-[11px] font-bold text-[#1E88E5]">{Number(r.声量).toFixed(1)}/10</td>}
-                          {visibleColumns["简评"] && <td className="py-2 px-4 text-[11px] text-gray-600 italic">{r.简评}</td>}
-                        </tr>
-                      ))}
+                      {["网站", "APP", "微信", "社交媒体"].map(category => {
+                        const categoryResults = sortedResults?.filter(r => r.媒体类型 === category);
+                        if (!categoryResults || categoryResults.length === 0) return null;
+                        return (
+                          <React.Fragment key={category}>
+                            <tr className="bg-gray-50/80">
+                              <td colSpan={10} className="py-2 px-4 font-bold text-gray-500 text-[10px] uppercase tracking-wider border-b">
+                                📁 {category}
+                              </td>
+                            </tr>
+                            {categoryResults.map((r, i) => (
+                              <tr key={`${category}-${i}`} className="hover:bg-blue-50/50 transition-colors border-b">
+                                {visibleColumns["标题"] && <td className="py-2 px-4 truncate text-[11px]" title={r.标题}>{r.标题}</td>}
+                                {visibleColumns["媒体名称"] && <td className="py-2 px-4 truncate text-[11px]">{r.媒体名称}</td>}
+                                {visibleColumns["媒体分级"] && <td className="py-2 px-4 text-[11px]">{Number(r.媒体分级).toFixed(1)}/10</td>}
+                                {visibleColumns["受众精准度"] && <td className="py-2 px-4 text-[11px]">{Number(r.受众精准度).toFixed(1)}/10</td>}
+                                {visibleColumns["传播质量"] && <td className="py-2 px-4 text-[11px]">{Number(r.传播质量).toFixed(1)}/10</td>}
+                                {visibleColumns["声量"] && <td className="py-2 px-4 text-[11px] font-bold text-[#1E88E5]">{Number(r.声量).toFixed(1)}/10</td>}
+                                {visibleColumns["简评"] && <td className="py-2 px-4 text-[11px] text-gray-600 italic">{r.简评}</td>}
+                              </tr>
+                            ))}
+                          </React.Fragment>
+                        );
+                      })}
+                      {/* Handle any other categories not in the list */}
+                      {(() => {
+                        const otherResults = sortedResults?.filter(r => !["网站", "APP", "微信", "社交媒体"].includes(r.媒体类型));
+                        if (!otherResults || otherResults.length === 0) return null;
+                        return (
+                          <React.Fragment key="其他">
+                            <tr className="bg-gray-50/80">
+                              <td colSpan={10} className="py-2 px-4 font-bold text-gray-500 text-[10px] uppercase tracking-wider border-b">
+                                📁 其他
+                              </td>
+                            </tr>
+                            {otherResults.map((r, i) => (
+                              <tr key={`other-${i}`} className="hover:bg-blue-50/50 transition-colors border-b">
+                                {visibleColumns["标题"] && <td className="py-2 px-4 truncate text-[11px]" title={r.标题}>{r.标题}</td>}
+                                {visibleColumns["媒体名称"] && <td className="py-2 px-4 truncate text-[11px]">{r.媒体名称}</td>}
+                                {visibleColumns["媒体分级"] && <td className="py-2 px-4 text-[11px]">{Number(r.媒体分级).toFixed(1)}/10</td>}
+                                {visibleColumns["受众精准度"] && <td className="py-2 px-4 text-[11px]">{Number(r.受众精准度).toFixed(1)}/10</td>}
+                                {visibleColumns["传播质量"] && <td className="py-2 px-4 text-[11px]">{Number(r.传播质量).toFixed(1)}/10</td>}
+                                {visibleColumns["声量"] && <td className="py-2 px-4 text-[11px] font-bold text-[#1E88E5]">{Number(r.声量).toFixed(1)}/10</td>}
+                                {visibleColumns["简评"] && <td className="py-2 px-4 text-[11px] text-gray-600 italic">{r.简评}</td>}
+                              </tr>
+                            ))}
+                          </React.Fragment>
+                        );
+                      })()}
                     </tbody>
                   </table>
                 </div>
@@ -539,7 +578,15 @@ const App: React.FC = () => {
               <div className="st-alert st-info"><span>📈</span><div>请先完成“新闻稿评分”和“媒体报道评分”。</div></div>
             ) : (
               <div className="space-y-10 w-full overflow-hidden" id="project-report-content">
-                <h3 className="text-xl font-bold">📈 项目评分: {projectName || '未命名项目'}</h3>
+                <div className="flex flex-col gap-1">
+                  <div className="text-[10px] text-gray-400 font-medium uppercase tracking-widest">
+                    基于 {(() => {
+                      const d = new Date();
+                      return `${d.getFullYear()}年${String(d.getMonth() + 1).padStart(2, '0')}月${String(d.getDate()).padStart(2, '0')}日`;
+                    })()} 大数据
+                  </div>
+                  <h3 className="text-xl font-bold">📈 项目评分: {projectName || '未命名项目'}</h3>
+                </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                   {[{ l: "项目总分", k: "项目总分", ck: "总分简评" }, { l: "真需求", k: "真需求", ck: "真需求简评" }, { l: "获客效能", k: "获客效能", ck: "获客效能简评" }, { l: "声量", k: "声量", ck: "声量简评" }].map(m => {
                     const avgVal = batchResults.reduce((a, b) => a + parseFloat(b[m.k as keyof BatchResult] as string || "0"), 0) / batchResults.length;
