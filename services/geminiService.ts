@@ -30,10 +30,11 @@ export const analyzeWithGemini = async (
 
 （2）声量：评估内容的“传播力”和“影响力”。
 - 传播质量 (60%)：基于阅读量、点赞、转发、评论等真实数据计算出的质量分（此项由系统预计算，AI需参考整体内容质量给出评价）。
-- 媒体分级 (40%)：根据 [媒体名称] 的影响力等级自动打分：
-    - 10分：优质社交媒体（如头部大V）、党央媒（如人民日报）、优质垂类媒体（如丁香园）。
-    - 8分：较好的门户网站（如腾讯、新浪新闻）和主流媒体。
-    - 5分：广泛的大众媒体或区域性媒体。
+- 媒体分级 (40%)：根据 [媒体名称] 的影响力等级在 1-10 分之间打分：
+    - 9-10分：优质社交媒体（如头部大V）、党央媒（如人民日报）、优质垂类媒体（如丁香园、医脉通肿瘤、乳腺癌互助）。
+    - 7-8分：较好的门户网站（如腾讯、新浪新闻）和主流媒体。
+    - 4-6分：广泛的大众媒体或区域性媒体。
+    - 1-3分：影响力极低的小众媒体或非正规渠道。
 
 已知媒体参考：
 - 医脉通肿瘤：微信公众号，主要针对医疗专业人士 (HCP)，属于 Tier 1 (10分)。
@@ -64,7 +65,7 @@ ${content.substring(0, 5000)}`;
     km_score: { type: Type.NUMBER, description: "信息匹配得分 (1-10)" },
     acquisition_score: { type: Type.NUMBER, description: "获客效能得分 (1-10)，评估获取单个客户的投入总成本效率及转化潜力" },
     audience_precision_score: { type: Type.NUMBER, description: "受众精准度得分 (1-10)，依据媒体名称评估" },
-    tier_score: { type: Type.NUMBER, description: "媒体分级得分 (5, 8, 或 10)" },
+    tier_score: { type: Type.NUMBER, description: "媒体分级得分 (1-10)" },
     media_category: { type: Type.STRING, description: "媒体类型，必须从以下选项中选择：'网站', 'APP', '微信', '社交媒体'" },
     one_sentence_summary: { type: Type.STRING, description: "简评 (100字以内)，必须包含该内容的优点和缺点，不要使用'优点：'或'缺点：'字样，直接描述内容并用分号分隔。" },
     acquisition_comment: { type: Type.STRING, description: "针对获客效能设计的专项简评 (100字以内)，需包含优缺点，不使用'优点：'或'缺点：'字样，直接描述并用分号分隔。" },

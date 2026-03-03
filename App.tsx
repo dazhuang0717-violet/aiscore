@@ -84,7 +84,7 @@ const App: React.FC = () => {
     };
   }, [resize, stopResizing]);
 
-  const calculateVolumeQuality = (views: any, interactions: any): number => {
+  const calculateVolumeQuality = (views: any, interactions: any, category: string = "网站"): number => {
     try {
       const cleanNum = (x: any) => {
         if (typeof x === 'string') {
@@ -95,7 +95,27 @@ const App: React.FC = () => {
       };
       const v = cleanNum(views);
       const i = cleanNum(interactions);
-      const rawScore = Math.log10(v + i * 5 + 10) * 1.5;
+
+      // 分渠道差异化权重
+      let vWeight = 0.05; // 网站默认 0.05 (20倍脱水)
+      let iWeight = 10;
+      let scale = 1.5;
+
+      if (category === "微信") {
+        vWeight = 1.0;  // 微信阅读含金量高
+        iWeight = 40;   // 互动极其重要
+        scale = 1.8;
+      } else if (category === "社交媒体") {
+        vWeight = 1.0;  // 社交媒体受众精准，阅读量含金量高
+        iWeight = 60;   // 互动是核心指标
+        scale = 1.8;
+      } else if (category === "APP") {
+        vWeight = 0.1;  // APP阅读量10倍脱水
+        iWeight = 15;
+        scale = 1.6;
+      }
+
+      const rawScore = Math.log10(v * vWeight + i * iWeight + 10) * scale;
       return Math.min(10.0, Math.round(rawScore * 10) / 10);
     } catch { return 1.0; }
   };
@@ -164,8 +184,6 @@ const App: React.FC = () => {
           const interactions = (parseFloat(row['点赞量']) || 0) + (parseFloat(row['转发量']) || 0) + (parseFloat(row['评论量']) || 0);
           const url = row['URL'] || row['链接'] || row['Link'] || "";
           
-          const volQuality = calculateVolumeQuality(views, interactions);
-          
           let aiRes: AIAnalysisResult = { 
             km_score: 1, 
             acquisition_score: 1, 
@@ -187,6 +205,7 @@ const App: React.FC = () => {
             } catch (e: any) { aiRes.comment = `AI分析失败: ${e.message}`; }
           }
           
+          const volQuality = calculateVolumeQuality(views, interactions, aiRes.media_category);
           const tierScore = aiRes.tier_score || 5;
           const volTotal = 0.6 * volQuality + 0.4 * tierScore;
           const trueDemand = 0.6 * aiRes.km_score + 0.4 * aiRes.audience_precision_score;
@@ -431,8 +450,9 @@ const App: React.FC = () => {
                   <div><span className="font-bold text-[#1E88E5]">真需求</span> = 0.6 × 信息匹配 + 0.4 × 受众精准度</div>
                   <div><span className="font-bold text-[#1E88E5]">声量</span> = 0.6 × 传播质量 + 0.4 × 媒体分级</div>
                 </div>
-                <div className="mt-4 text-xs md:text-sm text-gray-500 italic">
-                  * 获客效能：获取每个单个客户而投入的总成本效率，即能否高效地吸引潜在客户并转化为付费消费者。
+                <div className="mt-4 text-xs md:text-sm text-gray-500 italic flex flex-col gap-1">
+                  <div>* 获客效能：获取每个单个客户而投入的总成本效率，即能否高效地吸引潜在客户并转化为付费消费者。</div>
+                  <div>* 传播质量 = Log10(阅读量 × 阅读权重 + 互动量 × 互动权重 + 10) × 灵敏度系数</div>
                 </div>
               </div>
             </div>
@@ -591,7 +611,15 @@ const App: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                   {[{ l: "项目总分", k: "项目总分", ck: "总分简评" }, { l: "真需求", k: "真需求", ck: "真需求简评" }, { l: "获客效能", k: "获客效能", ck: "获客效能简评" }, { l: "声量", k: "声量", ck: "声量简评" }].map(m => {
-                    const avgVal = batchResults.reduce((a, b) => a + parseFloat(b[m.k as keyof BatchResult] as string || "0"), 0) / batchResults.length;
+                    // 采用“渠道平权平均法”：先算各类别平均，再算总平均，避免单一渠道数量过多干扰总分
+                    const categories = Array.from(new Set(batchResults.map(r => r.媒体类型)));
+                    const categoryAverages = categories.map(cat => {
+                      const catResults = batchResults.filter(r => r.媒体类型 === cat);
+                      const sum = catResults.reduce((a, b) => a + parseFloat(b[m.k as keyof BatchResult] as string || "0"), 0);
+                      return sum / catResults.length;
+                    });
+                    const avgVal = categoryAverages.reduce((a, b) => a + b, 0) / categories.length;
+                    
                     const comment = batchResults[0]?.[m.ck as keyof BatchResult] as string;
                     return (
                       <div key={m.l} className="st-metric shadow-sm border border-blue-50 flex flex-col">
