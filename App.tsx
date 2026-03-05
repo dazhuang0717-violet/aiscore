@@ -59,8 +59,8 @@ const App: React.FC = () => {
   });
 
   const tiers: Tiers = {
-    tier1: "人民日报,新华社,央视,丁香园,医脉通,健康报",
-    tier2: "腾讯,新浪,网易,搜狐,凤凰,澎湃,第一财经",
+    tier1: "人民日报,新华社,央视,环球网,丁香园,医脉通,好医生,健康报",
+    tier2: "腾讯,新浪,网易,搜狐,凤凰,澎湃,第一财经,医谷",
     tier3: "地方媒体,行业小报,其他"
   };
 
@@ -612,7 +612,13 @@ const App: React.FC = () => {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                   {[{ l: "项目总分", k: "项目总分", ck: "总分简评" }, { l: "真需求", k: "真需求", ck: "真需求简评" }, { l: "获客效能", k: "获客效能", ck: "获客效能简评" }, { l: "声量", k: "声量", ck: "声量简评" }].map(m => {
                     // 采用“渠道平权平均法”：先算各类别平均，再算总平均，避免单一渠道数量过多干扰总分
-                    const categories = Array.from(new Set(batchResults.map(r => r.媒体类型)));
+                    const categories = Array.from(new Set(batchResults.map(r => r.媒体类型))).filter(c => c);
+                    if (categories.length === 0) return (
+                      <div key={m.l} className="st-metric shadow-sm border border-blue-50 flex flex-col">
+                        <div className="st-metric-label">{m.l}</div>
+                        <div className="st-metric-value">0.0/10</div>
+                      </div>
+                    );
                     const categoryAverages = categories.map(cat => {
                       const catResults = batchResults.filter(r => r.媒体类型 === cat);
                       const sum = catResults.reduce((a, b) => a + parseFloat(b[m.k as keyof BatchResult] as string || "0"), 0);
