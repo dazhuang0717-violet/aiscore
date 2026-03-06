@@ -105,8 +105,8 @@ ${content.substring(0, 5000)}`;
     required.push("target_audience_score", "readability_score");
   }
 
-  let retries = 3;
-  let backoffMs = 2000;
+  let retries = 5; // 增加重试次数
+  let backoffMs = 3000; // 增加初始等待时间
 
   while (retries >= 0) {
     try {
@@ -128,13 +128,23 @@ ${content.substring(0, 5000)}`;
       return JSON.parse(text) as AIAnalysisResult;
     } catch (e: any) {
       const errorMsg = e.message || "";
-      const isRateLimit = errorMsg.includes("429") || errorMsg.includes("RESOURCE_EXHAUSTED");
+      const isRateLimit = errorMsg.includes("429") || errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("Quota exceeded");
+      
       if (isRateLimit && retries > 0) {
+        console.log(`命中频率限制，正在进行第 ${6 - retries} 次重试，等待 ${backoffMs}ms...`);
         await delay(backoffMs);
         retries--;
-        backoffMs *= 2;
+        backoffMs *= 2; // 指数退避
         continue;
       }
+      
+      // 如果是其他错误（如 500），也尝试重试一次
+      if (retries > 0 && (errorMsg.includes("500") || errorMsg.includes("503"))) {
+        await delay(1000);
+        retries--;
+        continue;
+      }
+
       throw e;
     }
   }

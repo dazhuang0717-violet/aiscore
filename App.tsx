@@ -173,64 +173,79 @@ const App: React.FC = () => {
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const json = window.XLSX.utils.sheet_to_json(sheet) as any[];
         
+        const concurrency = 3; // 并行度
         const results: BatchResult[] = [];
         const totalRows = json.length;
 
-        for (let i = 0; i < totalRows; i++) {
-          const row = json[i];
-          const mediaName = row['媒体名称'] || row['媒体'] || "未知";
-          const title = row['标题'] || row['Title'] || row['正文']?.substring(0, 20) || "无标题";
-          const views = row['浏览量'] || row['PV'] || 0;
-          const interactions = (parseFloat(row['点赞量']) || 0) + (parseFloat(row['转发量']) || 0) + (parseFloat(row['评论量']) || 0);
-          const url = row['URL'] || row['链接'] || row['Link'] || "";
-          
-          let aiRes: AIAnalysisResult = { 
-            km_score: 1, 
-            acquisition_score: 1, 
-            audience_precision_score: 1, 
-            tier_score: 5,
-            comment: "待评估" 
-          };
-          let content = row['正文'] || row['Content'] || row['标题'] || title || "";
-          
-          if (!content && url && url.startsWith("http")) {
-            const scraped = await fetchUrlContent(url);
-            if (scraped) content = scraped;
-          }
-          
-          if (content || mediaName) {
-            try { 
-              if (i > 0) await new Promise(res => setTimeout(res, 800));
-              aiRes = await analyzeWithGemini(content, audienceModes, projectKeyMessage, projectDesc, mediaName); 
-            } catch (e: any) { aiRes.comment = `AI分析失败: ${e.message}`; }
-          }
-          
-          const volQuality = calculateVolumeQuality(views, interactions, aiRes.media_category);
-          const tierScore = aiRes.tier_score || 5;
-          const volTotal = 0.6 * volQuality + 0.4 * tierScore;
-          const trueDemand = 0.6 * aiRes.km_score + 0.4 * aiRes.audience_precision_score;
-          const totalScore = (0.5 * trueDemand) + (0.2 * aiRes.acquisition_score) + (0.3 * volTotal);
-          
-          results.push({
-            "标题": title,
-            "媒体名称": mediaName,
-            "媒体类型": aiRes.media_category || "网站",
-            "项目总分": totalScore.toFixed(1),
-            "真需求": trueDemand.toFixed(1),
-            "获客效能": aiRes.acquisition_score,
-            "声量": volTotal.toFixed(1),
-            "核心信息匹配": aiRes.km_score,
-            "受众精准度": aiRes.audience_precision_score,
-            "媒体分级": tierScore,
-            "传播质量": volQuality,
-            "评价": aiRes.comment,
-            "简评": aiRes.one_sentence_summary || "",
-            "获客效能简评": aiRes.acquisition_comment || "",
-            "真需求简评": aiRes.true_demand_comment || "",
-            "声量简评": aiRes.volume_comment || "",
-            "总分简评": aiRes.total_score_comment || ""
+        for (let i = 0; i < totalRows; i += concurrency) {
+          const chunk = json.slice(i, i + concurrency);
+          const chunkPromises = chunk.map(async (row, indexInChunk) => {
+            const mediaName = row['媒体名称'] || row['媒体'] || "未知";
+            const title = row['标题'] || row['Title'] || row['正文']?.substring(0, 20) || "无标题";
+            const views = row['浏览量'] || row['PV'] || 0;
+            const interactions = (parseFloat(row['点赞量']) || 0) + (parseFloat(row['转发量']) || 0) + (parseFloat(row['评论量']) || 0);
+            const url = row['URL'] || row['链接'] || row['Link'] || "";
+            
+            let aiRes: AIAnalysisResult = { 
+              km_score: 1, 
+              acquisition_score: 1, 
+              audience_precision_score: 1, 
+              tier_score: 5,
+              comment: "待评估" 
+            };
+            let content = row['正文'] || row['Content'] || row['标题'] || title || "";
+            
+            if (!content && url && url.startsWith("http")) {
+              const scraped = await fetchUrlContent(url);
+              if (scraped) content = scraped;
+            }
+            
+            if (content || mediaName) {
+              try { 
+                // 组内错开请求，避免瞬间并发过高触发 429
+                if (indexInChunk > 0) await new Promise(res => setTimeout(res, indexInChunk * 1000));
+                aiRes = await analyzeWithGemini(content, audienceModes, projectKeyMessage, projectDesc, mediaName); 
+              } catch (e: any) { 
+                aiRes.comment = `AI分析失败: ${e.message}`; 
+                aiRes.one_sentence_summary = "分析失败";
+              }
+            }
+            
+            const volQuality = calculateVolumeQuality(views, interactions, aiRes.media_category);
+            const tierScore = aiRes.tier_score || 5;
+            const volTotal = 0.6 * volQuality + 0.4 * tierScore;
+            const trueDemand = 0.6 * aiRes.km_score + 0.4 * aiRes.audience_precision_score;
+            const totalScore = (0.5 * trueDemand) + (0.2 * aiRes.acquisition_score) + (0.3 * volTotal);
+            
+            return {
+              "标题": title,
+              "媒体名称": mediaName,
+              "媒体类型": aiRes.media_category || "网站",
+              "项目总分": totalScore.toFixed(1),
+              "真需求": trueDemand.toFixed(1),
+              "获客效能": aiRes.acquisition_score,
+              "声量": volTotal.toFixed(1),
+              "核心信息匹配": aiRes.km_score,
+              "受众精准度": aiRes.audience_precision_score,
+              "媒体分级": tierScore,
+              "传播质量": volQuality,
+              "评价": aiRes.comment,
+              "简评": aiRes.one_sentence_summary || "",
+              "获客效能简评": aiRes.acquisition_comment || "",
+              "真需求简评": aiRes.true_demand_comment || "",
+              "声量简评": aiRes.volume_comment || "",
+              "总分简评": aiRes.total_score_comment || ""
+            };
           });
-          setProgress(Math.round(((i + 1) / totalRows) * 100));
+
+          const chunkResults = await Promise.all(chunkPromises);
+          results.push(...chunkResults);
+          setProgress(Math.round((results.length / totalRows) * 100));
+          
+          // 组间休息，给 API 喘息时间
+          if (results.length < totalRows) {
+            await new Promise(res => setTimeout(res, 2000));
+          }
         }
         setBatchResults(results);
       } catch (err: any) { setErrorLog("Excel 处理错误: " + err.message); } finally { setIsProcessing(false); }
