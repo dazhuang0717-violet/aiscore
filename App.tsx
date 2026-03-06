@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { analyzeWithGemini } from './services/geminiService';
+import { analyzeWithGemini, analyzeBatchWithGemini, BatchAnalysisInput } from './services/geminiService';
 import { Tiers, WordResult, BatchResult, AudienceMode, AIAnalysisResult } from './types';
 
 declare global {
@@ -173,78 +173,89 @@ const App: React.FC = () => {
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const json = window.XLSX.utils.sheet_to_json(sheet) as any[];
         
-        const concurrency = 3; // 并行度
+        const batchSize = 5; // 每 5 条数据打包成一个 API 请求
+        const concurrency = 4; // 同时进行 4 个 API 请求 (即同时处理 20 条数据)
         const results: BatchResult[] = [];
         const totalRows = json.length;
 
-        for (let i = 0; i < totalRows; i += concurrency) {
-          const chunk = json.slice(i, i + concurrency);
-          const chunkPromises = chunk.map(async (row, indexInChunk) => {
-            const mediaName = row['媒体名称'] || row['媒体'] || "未知";
-            const title = row['标题'] || row['Title'] || row['正文']?.substring(0, 20) || "无标题";
-            const views = row['浏览量'] || row['PV'] || 0;
-            const interactions = (parseFloat(row['点赞量']) || 0) + (parseFloat(row['转发量']) || 0) + (parseFloat(row['评论量']) || 0);
-            const url = row['URL'] || row['链接'] || row['Link'] || "";
-            
-            let aiRes: AIAnalysisResult = { 
-              km_score: 1, 
-              acquisition_score: 1, 
-              audience_precision_score: 1, 
-              tier_score: 5,
-              comment: "待评估" 
-            };
-            let content = row['正文'] || row['Content'] || row['标题'] || title || "";
-            
-            if (!content && url && url.startsWith("http")) {
-              const scraped = await fetchUrlContent(url);
-              if (scraped) content = scraped;
-            }
-            
-            if (content || mediaName) {
-              try { 
-                // 组内错开请求，避免瞬间并发过高触发 429
-                if (indexInChunk > 0) await new Promise(res => setTimeout(res, indexInChunk * 1000));
-                aiRes = await analyzeWithGemini(content, audienceModes, projectKeyMessage, projectDesc, mediaName); 
-              } catch (e: any) { 
-                aiRes.comment = `AI分析失败: ${e.message}`; 
-                aiRes.one_sentence_summary = "分析失败";
+        for (let i = 0; i < totalRows; i += batchSize * concurrency) {
+          const group = json.slice(i, i + batchSize * concurrency);
+          
+          // 将 group 拆分为多个 batch
+          const batches: any[][] = [];
+          for (let j = 0; j < group.length; j += batchSize) {
+            batches.push(group.slice(j, j + batchSize));
+          }
+
+          const groupPromises = batches.map(async (batch) => {
+            const batchInputs: BatchAnalysisInput[] = await Promise.all(batch.map(async (row) => {
+              const title = row['标题'] || row['Title'] || row['正文']?.substring(0, 20) || "无标题";
+              const url = row['URL'] || row['链接'] || row['Link'] || "";
+              let content = row['正文'] || row['Content'] || row['标题'] || title || "";
+              const mediaName = row['媒体名称'] || row['媒体'] || "未知";
+
+              if (!content && url && url.startsWith("http")) {
+                const scraped = await fetchUrlContent(url);
+                if (scraped) content = scraped;
               }
+              return { content, mediaName };
+            }));
+
+            try {
+              const aiResults = await analyzeBatchWithGemini(batchInputs, audienceModes, projectKeyMessage, projectDesc);
+              
+              return batch.map((row, idx) => {
+                const aiRes = aiResults[idx] || { 
+                  km_score: 1, acquisition_score: 1, audience_precision_score: 1, tier_score: 5,
+                  comment: "分析失败", one_sentence_summary: "分析失败"
+                };
+                
+                const views = row['浏览量'] || row['PV'] || 0;
+                const interactions = (parseFloat(row['点赞量']) || 0) + (parseFloat(row['转发量']) || 0) + (parseFloat(row['评论量']) || 0);
+                const volQuality = calculateVolumeQuality(views, interactions, aiRes.media_category);
+                const tierScore = aiRes.tier_score || 5;
+                const volTotal = 0.6 * volQuality + 0.4 * tierScore;
+                const trueDemand = 0.6 * aiRes.km_score + 0.4 * aiRes.audience_precision_score;
+                const totalScore = (0.5 * trueDemand) + (0.2 * aiRes.acquisition_score) + (0.3 * volTotal);
+
+                return {
+                  "标题": row['标题'] || row['Title'] || row['正文']?.substring(0, 20) || "无标题",
+                  "媒体名称": row['媒体名称'] || row['媒体'] || "未知",
+                  "媒体类型": aiRes.media_category || "网站",
+                  "项目总分": totalScore.toFixed(1),
+                  "真需求": trueDemand.toFixed(1),
+                  "获客效能": aiRes.acquisition_score,
+                  "声量": volTotal.toFixed(1),
+                  "核心信息匹配": aiRes.km_score,
+                  "受众精准度": aiRes.audience_precision_score,
+                  "媒体分级": tierScore,
+                  "传播质量": volQuality,
+                  "评价": aiRes.comment,
+                  "简评": aiRes.one_sentence_summary || "",
+                  "获客效能简评": aiRes.acquisition_comment || "",
+                  "真需求简评": aiRes.true_demand_comment || "",
+                  "声量简评": aiRes.volume_comment || "",
+                  "总分简评": aiRes.total_score_comment || ""
+                };
+              });
+            } catch (e: any) {
+              console.error("Batch error:", e);
+              return batch.map(row => ({
+                "标题": row['标题'] || "分析失败",
+                "媒体名称": row['媒体名称'] || "未知",
+                "项目总分": "0.0",
+                "评价": `AI分析失败: ${e.message}`
+              } as any));
             }
-            
-            const volQuality = calculateVolumeQuality(views, interactions, aiRes.media_category);
-            const tierScore = aiRes.tier_score || 5;
-            const volTotal = 0.6 * volQuality + 0.4 * tierScore;
-            const trueDemand = 0.6 * aiRes.km_score + 0.4 * aiRes.audience_precision_score;
-            const totalScore = (0.5 * trueDemand) + (0.2 * aiRes.acquisition_score) + (0.3 * volTotal);
-            
-            return {
-              "标题": title,
-              "媒体名称": mediaName,
-              "媒体类型": aiRes.media_category || "网站",
-              "项目总分": totalScore.toFixed(1),
-              "真需求": trueDemand.toFixed(1),
-              "获客效能": aiRes.acquisition_score,
-              "声量": volTotal.toFixed(1),
-              "核心信息匹配": aiRes.km_score,
-              "受众精准度": aiRes.audience_precision_score,
-              "媒体分级": tierScore,
-              "传播质量": volQuality,
-              "评价": aiRes.comment,
-              "简评": aiRes.one_sentence_summary || "",
-              "获客效能简评": aiRes.acquisition_comment || "",
-              "真需求简评": aiRes.true_demand_comment || "",
-              "声量简评": aiRes.volume_comment || "",
-              "总分简评": aiRes.total_score_comment || ""
-            };
           });
 
-          const chunkResults = await Promise.all(chunkPromises);
-          results.push(...chunkResults);
+          const groupResults = await Promise.all(groupPromises);
+          groupResults.forEach(batchRes => results.push(...batchRes));
           setProgress(Math.round((results.length / totalRows) * 100));
           
-          // 组间休息，给 API 喘息时间
+          // 组间稍微休息，避免触发全局速率限制
           if (results.length < totalRows) {
-            await new Promise(res => setTimeout(res, 2000));
+            await new Promise(res => setTimeout(res, 1000));
           }
         }
         setBatchResults(results);
@@ -255,7 +266,20 @@ const App: React.FC = () => {
 
   const exportToExcel = () => {
     if (!batchResults) return;
-    const worksheet = window.XLSX.utils.json_to_sheet(batchResults);
+    
+    // 过滤字段，只保留用户要求的列
+    const filteredData = batchResults.map(item => ({
+      "标题": item["标题"],
+      "媒体名称": item["媒体名称"],
+      "媒体类型": item["媒体类型"],
+      "受众精准度": item["受众精准度"],
+      "媒体分级": item["媒体分级"],
+      "传播质量": item["传播质量"],
+      "声量": item["声量"],
+      "简评": item["简评"]
+    }));
+
+    const worksheet = window.XLSX.utils.json_to_sheet(filteredData);
     const workbook = window.XLSX.utils.book_new();
     window.XLSX.utils.book_append_sheet(workbook, worksheet, "分析结果");
     window.XLSX.writeFile(workbook, `${projectName || '罗氏肿瘤传播分析'}_结果.xlsx`);
@@ -265,11 +289,17 @@ const App: React.FC = () => {
     const element = document.getElementById('project-report-content');
     if (!element) return;
     const opt = {
-      margin: 0.5,
+      margin: [0.3, 0.3, 0.3, 0.3], // 稍微缩小边距以容纳更多内容
       filename: `${projectName || '罗氏肿瘤传播分析'}_评分报告.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+      html2canvas: { 
+        scale: 2, 
+        useCORS: true,
+        logging: false,
+        letterRendering: true
+      },
+      jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] } // 优化分页，避免内容被截断
     };
     window.html2pdf().set(opt).from(element).save();
   };

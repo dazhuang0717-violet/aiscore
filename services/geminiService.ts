@@ -150,3 +150,110 @@ ${content.substring(0, 5000)}`;
   }
   throw new Error("重试耗尽");
 };
+
+export interface BatchAnalysisInput {
+  content: string;
+  mediaName: string;
+}
+
+export const analyzeBatchWithGemini = async (
+  items: BatchAnalysisInput[],
+  audienceModes: string[],
+  projectKeyMessage: string, 
+  projectDesc: string
+): Promise<AIAnalysisResult[]> => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === "undefined" || apiKey === "") {
+    throw new Error("Gemini API Key 尚未配置。");
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
+  
+  const itemsPrompt = items.map((item, index) => `
+--- 待分析项 #${index + 1} ---
+媒体名称: ${item.mediaName}
+内容: ${item.content.substring(0, 2000)}
+`).join("\n");
+
+  const prompt = `你是一个专业的罗氏肿瘤领域公关传播分析师。
+请对以下 ${items.length} 个传播项进行批量评分。
+
+项目背景：
+- 受众模式: ${audienceModes.join(", ")}
+- 核心信息 (Key Message): ${projectKeyMessage}
+- 项目描述 (获客效能): ${projectDesc}
+
+${itemsPrompt}
+
+评分规则与输出要求：
+请为每个待分析项返回一个 JSON 对象，结果必须是一个包含 ${items.length} 个对象的数组。
+每个对象必须包含以下字段：
+1. km_score (1-10): 信息匹配得分
+2. acquisition_score (1-10): 获客效能得分
+3. audience_precision_score (1-10): 受众精准度得分
+4. tier_score (1-10): 媒体分级得分
+5. media_category: '网站', 'APP', '微信', '社交媒体' 之一
+6. one_sentence_summary: 简评 (100字以内)
+7. acquisition_comment: 获客效能简评
+8. true_demand_comment: 真需求简评
+9. volume_comment: 声量简评
+10. total_score_comment: 总分简评
+11. comment: 详细评价`;
+
+  let retries = 3;
+  let backoffMs = 2000;
+
+  while (retries >= 0) {
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                km_score: { type: Type.NUMBER },
+                acquisition_score: { type: Type.NUMBER },
+                audience_precision_score: { type: Type.NUMBER },
+                tier_score: { type: Type.NUMBER },
+                media_category: { type: Type.STRING },
+                one_sentence_summary: { type: Type.STRING },
+                acquisition_comment: { type: Type.STRING },
+                true_demand_comment: { type: Type.STRING },
+                volume_comment: { type: Type.STRING },
+                total_score_comment: { type: Type.STRING },
+                comment: { type: Type.STRING },
+              },
+              required: ["km_score", "acquisition_score", "audience_precision_score", "tier_score", "media_category", "one_sentence_summary", "comment"],
+            },
+          },
+        },
+      });
+
+      const text = response.text;
+      if (!text) throw new Error("AI 返回了空响应");
+      const results = JSON.parse(text);
+      
+      // 补全可能缺失的字段
+      return results.map((r: any) => ({
+        ...r,
+        acquisition_comment: r.acquisition_comment || r.one_sentence_summary || "待评估",
+        true_demand_comment: r.true_demand_comment || r.one_sentence_summary || "待评估",
+        volume_comment: r.volume_comment || r.one_sentence_summary || "待评估",
+        total_score_comment: r.total_score_comment || r.one_sentence_summary || "待评估",
+      }));
+    } catch (e: any) {
+      if (retries > 0) {
+        await delay(backoffMs);
+        retries--;
+        backoffMs *= 2;
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw new Error("批量分析重试耗尽");
+};
