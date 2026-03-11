@@ -33,6 +33,7 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<"tab1" | "tab2" | "tab3">("tab1");
   const [isExpanderOpen, setIsExpanderOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
   const [progress, setProgress] = useState(0);
   const [errorLog, setErrorLog] = useState(""); 
   const [showColPicker, setShowColPicker] = useState(false);
@@ -43,6 +44,7 @@ const App: React.FC = () => {
   
   // --- Table Interaction State ---
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
+  const [acquisitionProjectResult, setAcquisitionProjectResult] = useState<{score: number, comment: string} | null>(null);
   
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
     "标题": true,
@@ -160,6 +162,10 @@ const App: React.FC = () => {
   const handleExcelFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    
+    const controller = new AbortController();
+    setAbortController(controller);
+    
     setIsProcessing(true);
     setErrorLog("");
     setBatchResults(null);
@@ -179,6 +185,11 @@ const App: React.FC = () => {
         const totalRows = json.length;
 
         for (let i = 0; i < totalRows; i += batchSize * concurrency) {
+          if (controller.signal.aborted) {
+            setErrorLog("分析已由用户停止。已处理的数据已保留。");
+            break;
+          }
+          
           const group = json.slice(i, i + batchSize * concurrency);
           
           // 将 group 拆分为多个 batch
@@ -251,14 +262,17 @@ const App: React.FC = () => {
 
           const groupResults = await Promise.all(groupPromises);
           groupResults.forEach(batchRes => results.push(...batchRes));
+          
+          // 增量更新结果，让用户看到数据在流动，避免“卡死”感
+          const currentResults = [...results];
+          setBatchResults(currentResults);
           setProgress(Math.round((results.length / totalRows) * 100));
           
           // 组间稍微休息，避免触发全局速率限制
           if (results.length < totalRows) {
-            await new Promise(res => setTimeout(res, 1000));
+            await new Promise(res => setTimeout(res, 800));
           }
         }
-        setBatchResults(results);
       } catch (err: any) { setErrorLog("Excel 处理错误: " + err.message); } finally { setIsProcessing(false); }
     };
     reader.readAsArrayBuffer(file);
@@ -304,6 +318,31 @@ const App: React.FC = () => {
     window.html2pdf().set(opt).from(element).save();
   };
 
+  const analyzeAcquisitionEffectiveness = async () => {
+    if (!projectDesc || !projectKeyMessage) {
+      setErrorLog("请先在侧边栏填写项目描述和核心信息。");
+      return;
+    }
+    setIsProcessing(true);
+    try {
+      const response = await analyzeWithGemini(
+        `请评估该项目的获客效能潜力。项目描述：${projectDesc}。核心信息：${projectKeyMessage}`,
+        audienceModes,
+        projectKeyMessage,
+        projectDesc,
+        "项目整体"
+      );
+      setAcquisitionProjectResult({
+        score: response.acquisition_score,
+        comment: response.acquisition_comment || response.one_sentence_summary || "评估完成"
+      });
+    } catch (err: any) {
+      setErrorLog("获客效能分析失败: " + err.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const requestSort = (key: keyof BatchResult) => {
     let direction: 'asc' | 'desc' = 'desc';
     if (sortConfig && sortConfig.key === key && sortConfig.direction === 'desc') {
@@ -329,6 +368,16 @@ const App: React.FC = () => {
     }
     return sortableItems;
   }, [batchResults, sortConfig]);
+
+  const groupedResults = useMemo(() => {
+    if (!sortedResults) return {};
+    return sortedResults.reduce((acc, r) => {
+      const cat = r.媒体类型 || "其他";
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(r);
+      return acc;
+    }, {} as Record<string, BatchResult[]>);
+  }, [sortedResults]);
 
   const top10Results = useMemo(() => {
     if (!batchResults) return [];
@@ -428,9 +477,12 @@ const App: React.FC = () => {
   }, [activeTab, batchResults]);
 
   useEffect(() => {
-    const timer = setTimeout(renderCharts, 200);
+    // 只有在非处理状态或者进度完成时才渲染图表，减少处理过程中的计算压力
+    if (isProcessing && progress % 20 !== 0 && progress !== 100) return;
+    
+    const timer = setTimeout(renderCharts, 300);
     return () => clearTimeout(timer);
-  }, [renderCharts, activeTab]);
+  }, [renderCharts, activeTab, isProcessing, progress]);
 
   return (
     <div className="flex">
@@ -512,223 +564,271 @@ const App: React.FC = () => {
 
         {activeTab === 'tab1' && (
           <div className="animate-fadeIn">
-            <div className="st-alert st-info"><span>📄</span><div>上传新闻稿 Word 文档，AI 将评价核心信息传递情况。</div></div>
-            <div className="mb-4">
-              <label className="text-sm font-semibold block mb-2">上传 .docx 文件</label>
-              <input type="file" accept=".docx" onChange={handleWordFile} className="st-input h-auto py-4 bg-gray-50 border-dashed" />
-            </div>
-            {isProcessing && <div className="text-blue-600 font-bold mb-4 flex items-center gap-2 animate-pulse">⏳ AI 正在深度阅读文档...</div>}
-            {wordResult && (
-              <div className="mt-8 border-t pt-6 animate-fadeIn">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                  <div className="st-metric"><div className="st-metric-label">信息匹配度</div><div className="st-metric-value">{wordResult.km_score.toFixed(1)}/10</div></div>
-                  <div className="st-metric"><div className="st-metric-label">目标受众</div><div className="st-metric-value">{(wordResult.target_audience_score || 0).toFixed(1)}/10</div></div>
-                  <div className="st-metric"><div className="st-metric-label">可读性</div><div className="st-metric-value">{(wordResult.readability_score || 0).toFixed(1)}/10</div></div>
+            <div className="apple-card">
+              <div className="st-alert st-info"><span>📄</span><div>上传新闻稿 Word 文档，AI 将评价核心信息传递情况。</div></div>
+              <div className="mb-6">
+                <label className="text-sm font-normal block mb-2 text-gray-700">上传 .docx 文件</label>
+                <div className="relative group">
+                  <input type="file" accept=".docx" onChange={handleWordFile} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+                  <div className="st-input h-32 flex flex-col items-center justify-center border-dashed border-2 border-gray-200 group-hover:border-blue-400 transition-colors bg-gray-50/50 rounded-2xl">
+                    <span className="text-3xl mb-2">📄</span>
+                    <span className="text-sm text-gray-500">点击或拖拽 Word 文件至此</span>
+                  </div>
                 </div>
-                <div className="bg-blue-50 border-l-4 border-[#1E88E5] p-4 rounded-r"><h4 className="font-bold text-[#1E88E5] text-sm mb-2">💡 AI 简评</h4><p className="text-sm text-gray-800 leading-relaxed">{wordResult.comment}</p></div>
               </div>
-            )}
+              {isProcessing && <div className="text-blue-600 font-bold mb-4 flex items-center gap-2 animate-pulse">⏳ AI 正在深度阅读文档...</div>}
+              {wordResult && (
+                <div className="mt-8 border-t pt-8 animate-fadeIn">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div className="st-metric"><div className="st-metric-label">信息匹配度</div><div className="st-metric-value">{wordResult.km_score.toFixed(1)}/10</div></div>
+                    <div className="st-metric"><div className="st-metric-label">目标受众</div><div className="st-metric-value">{(wordResult.target_audience_score || 0).toFixed(1)}/10</div></div>
+                    <div className="st-metric"><div className="st-metric-label">可读性</div><div className="st-metric-value">{(wordResult.readability_score || 0).toFixed(1)}/10</div></div>
+                  </div>
+                  <div className="bg-blue-50/50 border-l-4 border-[#0066cc] p-6 rounded-r-2xl shadow-sm">
+                    <h4 className="font-bold text-[#0066cc] text-sm mb-3">💡 AI 简评</h4>
+                    <p className="text-sm text-gray-800 leading-relaxed">{wordResult.comment}</p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {activeTab === 'tab2' && (
           <div className="animate-fadeIn">
-            <div className="st-alert st-info"><span>💡</span><div>微信公众号、视频号等封闭平台内容无法自动爬取，请在 Excel 中插入“正文”列并手动填入文章内容。</div></div>
-            <div className="mb-4">
-              <label className="text-sm font-semibold block mb-2">上传媒体监测报表</label>
-              <input type="file" accept=".xlsx,.csv" onChange={handleExcelFile} className="st-input h-auto py-4 bg-gray-50 border-dashed" />
-            </div>
-            {isProcessing && (
-              <div className="mb-4">
-                <div className="flex justify-between text-xs mb-1 font-bold text-blue-600"><span>分析进度</span><span>{progress}%</span></div>
-                <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden"><div className="bg-[#1E88E5] h-full transition-all duration-300" style={{width: `${progress}%`}}></div></div>
-              </div>
-            )}
-            {batchResults && (
-              <div className="mt-8">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="font-bold">📋 媒体报道评分</h3>
-                  <div className="flex gap-2">
-                    <div className="relative">
-                      <button onClick={() => setShowColPicker(!showColPicker)} className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded text-xs font-medium border border-gray-300 flex items-center gap-1 transition-all">📊 列显示</button>
-                      {showColPicker && (
-                        <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-50 p-3 w-48 animate-fadeIn">
-                          <p className="text-[10px] font-bold text-gray-400 mb-2 uppercase">显示列</p>
-                          {pickableColumns.map(col => (
-                            <label key={col} className="flex items-center gap-2 mb-1 cursor-pointer hover:bg-gray-50 p-1 rounded transition-colors">
-                              <input type="checkbox" checked={visibleColumns[col]} onChange={() => setVisibleColumns({...visibleColumns, [col]: !visibleColumns[col]})} className="w-3 h-3" />
-                              <span className="text-xs text-gray-600">{col}</span>
-                            </label>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <button className="st-button-primary text-xs px-4" onClick={exportToExcel}>导出 Excel</button>
+            <div className="apple-card">
+              <div className="st-alert st-info"><span>💡</span><div>微信公众号、视频号等封闭平台内容无法自动爬取，请在 Excel 中插入“正文”列并手动填入文章内容。</div></div>
+              <div className="mb-6">
+                <label className="text-sm font-normal block mb-2 text-gray-700">上传媒体监测报表</label>
+                <div className="relative group">
+                  <input type="file" accept=".xlsx,.csv" onChange={handleExcelFile} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+                  <div className="st-input h-32 flex flex-col items-center justify-center border-dashed border-2 border-gray-200 group-hover:border-blue-400 transition-colors bg-gray-50/50 rounded-2xl">
+                    <span className="text-3xl mb-2">📊</span>
+                    <span className="text-sm text-gray-500">点击或拖拽 Excel/CSV 文件至此</span>
                   </div>
                 </div>
-                <div className="overflow-auto max-h-[600px] border border-gray-200 rounded-lg shadow-sm no-scrollbar">
-                  <table className="border-separate border-spacing-0 w-full min-w-[800px] table-fixed">
-                    <thead className="sticky top-0 z-10 shadow-sm">
-                      <tr>
-                        {visibleColumns["标题"] && <th onClick={() => requestSort('标题')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors text-xs w-[12%]">标题</th>}
-                        {visibleColumns["媒体名称"] && <th onClick={() => requestSort('媒体名称')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors text-xs w-[12%]">媒体名称</th>}
-                        {visibleColumns["媒体分级"] && <th onClick={() => requestSort('媒体分级')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors text-xs w-[10%]">媒体分级</th>}
-                        {visibleColumns["受众精准度"] && <th onClick={() => requestSort('受众精准度')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors text-xs w-[10%]">受众精准度</th>}
-                        {visibleColumns["传播质量"] && <th onClick={() => requestSort('传播质量')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left cursor-pointer hover:bg-gray-200 transition-colors text-xs w-[10%]">传播质量</th>}
-                        {visibleColumns["声量"] && <th onClick={() => requestSort('声量')} className="border-b bg-[#f8f9fa] py-3 px-4 text-left font-bold cursor-pointer hover:bg-gray-200 transition-colors text-xs text-[#1E88E5] w-[10%]">声量</th>}
-                        {visibleColumns["简评"] && <th className="border-b bg-[#f8f9fa] py-3 px-4 text-left text-xs w-[36%]">简评</th>}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {["网站", "APP", "微信", "社交媒体"].map(category => {
-                        const categoryResults = sortedResults?.filter(r => r.媒体类型 === category);
-                        if (!categoryResults || categoryResults.length === 0) return null;
-                        const colCount = pickableColumns.filter(c => visibleColumns[c]).length;
-                        return (
-                          <React.Fragment key={category}>
-                            <tr className="bg-gray-50/80">
-                              <td colSpan={colCount} className="py-2 px-4 font-bold text-gray-500 text-[10px] uppercase tracking-wider border-b">
-                                📁 {category}
-                              </td>
-                            </tr>
-                            {categoryResults.map((r, i) => (
-                              <tr key={`${category}-${i}`} className="hover:bg-blue-50/50 transition-colors border-b">
-                                {visibleColumns["标题"] && <td className="py-2 px-4 truncate text-[11px] w-[12%]" title={r.标题}>{r.标题}</td>}
-                                {visibleColumns["媒体名称"] && <td className="py-2 px-4 truncate text-[11px] w-[12%]">{r.媒体名称}</td>}
-                                {visibleColumns["媒体分级"] && <td className="py-2 px-4 text-[11px] w-[10%]">{Number(r.媒体分级).toFixed(1)}/10</td>}
-                                {visibleColumns["受众精准度"] && <td className="py-2 px-4 text-[11px] w-[10%]">{Number(r.受众精准度).toFixed(1)}/10</td>}
-                                {visibleColumns["传播质量"] && <td className="py-2 px-4 text-[11px] w-[10%]">{Number(r.传播质量).toFixed(1)}/10</td>}
-                                {visibleColumns["声量"] && <td className="py-2 px-4 text-[11px] font-bold text-[#1E88E5] w-[10%]">{Number(r.声量).toFixed(1)}/10</td>}
-                                {visibleColumns["简评"] && <td className="py-2 px-4 text-[11px] text-gray-600 italic w-[36%] leading-relaxed whitespace-normal">{r.简评}</td>}
-                              </tr>
-                            ))}
-                          </React.Fragment>
-                        );
-                      })}
-                      {/* Handle any other categories not in the list */}
-                      {(() => {
-                        const otherResults = sortedResults?.filter(r => !["网站", "APP", "微信", "社交媒体"].includes(r.媒体类型));
-                        if (!otherResults || otherResults.length === 0) return null;
-                        const colCount = pickableColumns.filter(c => visibleColumns[c]).length;
-                        return (
-                          <React.Fragment key="其他">
-                            <tr className="bg-gray-50/80">
-                              <td colSpan={colCount} className="py-2 px-4 font-bold text-gray-500 text-[10px] uppercase tracking-wider border-b">
-                                📁 其他
-                              </td>
-                            </tr>
-                            {otherResults.map((r, i) => (
-                              <tr key={`other-${i}`} className="hover:bg-blue-50/50 transition-colors border-b">
-                                {visibleColumns["标题"] && <td className="py-2 px-4 truncate text-[11px] w-[12%]" title={r.标题}>{r.标题}</td>}
-                                {visibleColumns["媒体名称"] && <td className="py-2 px-4 truncate text-[11px] w-[12%]">{r.媒体名称}</td>}
-                                {visibleColumns["媒体分级"] && <td className="py-2 px-4 text-[11px] w-[10%]">{Number(r.媒体分级).toFixed(1)}/10</td>}
-                                {visibleColumns["受众精准度"] && <td className="py-2 px-4 text-[11px] w-[10%]">{Number(r.受众精准度).toFixed(1)}/10</td>}
-                                {visibleColumns["传播质量"] && <td className="py-2 px-4 text-[11px] w-[10%]">{Number(r.传播质量).toFixed(1)}/10</td>}
-                                {visibleColumns["声量"] && <td className="py-2 px-4 text-[11px] font-bold text-[#1E88E5] w-[10%]">{Number(r.声量).toFixed(1)}/10</td>}
-                                {visibleColumns["简评"] && <td className="py-2 px-4 text-[11px] text-gray-600 italic w-[36%] leading-relaxed whitespace-normal">{r.简评}</td>}
-                              </tr>
-                            ))}
-                          </React.Fragment>
-                        );
-                      })()}
-                    </tbody>
-                  </table>
-                </div>
               </div>
-            )}
+              {isProcessing && (
+                <div className="mb-8 bg-blue-50/50 p-6 rounded-2xl border border-blue-100 shadow-sm animate-fadeIn">
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-sm font-bold text-blue-700 flex items-center gap-2">
+                      <span className="animate-spin">⏳</span> AI 正在深度分析中... ({batchResults?.length || 0} / {Math.round((batchResults?.length || 0) / (progress/100 || 1)) || '?'})
+                    </span>
+                    <div className="flex items-center gap-4">
+                      <span className="text-sm font-bold text-blue-700">{progress}%</span>
+                    </div>
+                  </div>
+                  <div className="w-full bg-gray-200 h-2.5 rounded-full overflow-hidden shadow-inner">
+                    <div className="bg-gradient-to-r from-blue-400 to-blue-600 h-full transition-all duration-500 ease-out relative" style={{width: `${progress}%`}}>
+                      <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {batchResults && (
+                <div className="mt-8 animate-fadeIn">
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="font-bold text-lg">📋 媒体报道评分</h3>
+                    <div className="flex gap-3">
+                      <div className="relative">
+                        <button onClick={() => setShowColPicker(!showColPicker)} className="bg-white hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-full text-xs font-semibold border border-gray-300 flex items-center gap-2 transition-all shadow-sm">📊 列显示</button>
+                        {showColPicker && (
+                          <div className="absolute right-0 top-full mt-2 bg-white border border-gray-100 rounded-2xl shadow-2xl z-50 p-4 w-56 animate-fadeIn">
+                            <p className="text-[10px] font-bold text-gray-400 mb-3 uppercase tracking-widest">显示列</p>
+                            <div className="space-y-1">
+                              {pickableColumns.map(col => (
+                                <label key={col} className="flex items-center gap-3 py-2 px-2 rounded-xl hover:bg-gray-50 cursor-pointer transition-colors">
+                                  <input type="checkbox" checked={visibleColumns[col]} onChange={() => setVisibleColumns({...visibleColumns, [col]: !visibleColumns[col]})} className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                  <span className="text-xs font-medium text-gray-700">{col}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <button className="st-button-primary text-xs px-6" onClick={exportToExcel}>导出 Excel</button>
+                    </div>
+                  </div>
+                  <div className="overflow-hidden border border-gray-100 rounded-2xl shadow-sm bg-white">
+                    <div className="overflow-auto max-h-[600px] no-scrollbar">
+                      <table className="w-full table-fixed">
+                        <thead className="sticky top-0 z-10 bg-white/90 backdrop-blur-md">
+                          <tr>
+                            {visibleColumns["标题"] && <th onClick={() => requestSort('标题')} className="cursor-pointer hover:text-blue-600 transition-colors w-[15%]">标题</th>}
+                            {visibleColumns["媒体名称"] && <th onClick={() => requestSort('媒体名称')} className="cursor-pointer hover:text-blue-600 transition-colors w-[12%]">媒体名称</th>}
+                            {visibleColumns["媒体分级"] && <th onClick={() => requestSort('媒体分级')} className="cursor-pointer hover:text-blue-600 transition-colors w-[10%]">媒体分级</th>}
+                            {visibleColumns["受众精准度"] && <th onClick={() => requestSort('受众精准度')} className="cursor-pointer hover:text-blue-600 transition-colors w-[10%]">受众精准度</th>}
+                            {visibleColumns["传播质量"] && <th onClick={() => requestSort('传播质量')} className="cursor-pointer hover:text-blue-600 transition-colors w-[10%]">传播质量</th>}
+                            {visibleColumns["声量"] && <th onClick={() => requestSort('声量')} className="font-bold cursor-pointer hover:text-blue-600 transition-colors text-blue-600 w-[10%]">声量</th>}
+                            {visibleColumns["简评"] && <th className="w-[33%]">简评</th>}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Object.keys(groupedResults).sort((a, b) => {
+                            const order = ["微信", "APP", "网站", "社交媒体", "其他"];
+                            return order.indexOf(a) - order.indexOf(b);
+                          }).map(category => {
+                            const categoryResults = groupedResults[category];
+                            if (!categoryResults || categoryResults.length === 0) return null;
+                            const colCount = pickableColumns.filter(c => visibleColumns[c]).length;
+                            return (
+                              <React.Fragment key={category}>
+                                <tr className="bg-gray-50/30">
+                                  <td colSpan={colCount} className="py-3 px-4 font-bold text-gray-400 text-[10px] uppercase tracking-widest bg-gray-50/50">
+                                    📁 {category}
+                                  </td>
+                                </tr>
+                                {categoryResults.map((r, i) => (
+                                  <tr key={`${category}-${i}`} className="hover:bg-blue-50/30 transition-colors">
+                                    {visibleColumns["标题"] && <td className="truncate font-medium" title={r.标题}>{r.标题}</td>}
+                                    {visibleColumns["媒体名称"] && <td className="truncate text-gray-600">{r.媒体名称}</td>}
+                                    {visibleColumns["媒体分级"] && <td className="text-gray-600">{Number(r.媒体分级).toFixed(1)}/10</td>}
+                                    {visibleColumns["受众精准度"] && <td className="text-gray-600">{Number(r.受众精准度).toFixed(1)}/10</td>}
+                                    {visibleColumns["传播质量"] && <td className="text-gray-600">{Number(r.传播质量).toFixed(1)}/10</td>}
+                                    {visibleColumns["声量"] && <td className="font-bold text-blue-600">{Number(r.声量).toFixed(1)}/10</td>}
+                                    {visibleColumns["简评"] && <td className="text-gray-500 italic leading-relaxed whitespace-normal text-xs">{r.简评}</td>}
+                                  </tr>
+                                ))}
+                              </React.Fragment>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {activeTab === 'tab3' && (
           <div className="animate-fadeIn min-w-0">
+            <div className="apple-card mb-8">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold">🎯 获客效能评分</h3>
+                {!acquisitionProjectResult && (
+                  <button 
+                    onClick={analyzeAcquisitionEffectiveness} 
+                    className="st-button-primary shadow-md hover:shadow-lg"
+                    disabled={isProcessing}
+                  >
+                    {isProcessing ? "⏳ 正在分析..." : "🚀 开始获客效能评分"}
+                  </button>
+                )}
+              </div>
+              
+              {acquisitionProjectResult ? (
+                <div className="animate-fadeIn">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                    <div className="st-metric md:col-span-1">
+                      <div className="st-metric-label">获客效能潜力</div>
+                      <div className="st-metric-value text-blue-600">{acquisitionProjectResult.score.toFixed(1)}/10</div>
+                    </div>
+                    <div className="md:col-span-3 bg-blue-50/50 p-6 rounded-2xl border border-blue-100">
+                      <h4 className="font-bold text-blue-700 text-sm mb-2">💡 获客效能简评</h4>
+                      <p className="text-sm text-gray-700 leading-relaxed">{acquisitionProjectResult.comment}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-10 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
+                </div>
+              )}
+            </div>
+
             {!batchResults ? (
-              <div className="st-alert st-info"><span>📈</span><div>请先完成“新闻稿评分”和“媒体报道评分”。</div></div>
+              <div className="apple-card bg-gray-50/50 border-dashed">
+                <div className="st-alert st-info">
+                  <span>📈</span>
+                  <div className="font-medium">查看其余评分，请先完成“新闻稿评分”和“媒体报道评分”。</div>
+                </div>
+              </div>
             ) : (
               <div className="space-y-10 w-full overflow-hidden" id="project-report-content">
-                <div className="flex flex-col gap-1">
-                  <div className="text-[10px] text-gray-400 font-medium uppercase tracking-widest">
-                    基于 {(() => {
-                      const d = new Date();
-                      return `${d.getFullYear()}年${String(d.getMonth() + 1).padStart(2, '0')}月${String(d.getDate()).padStart(2, '0')}日`;
-                    })()} 大数据
+                <div className="apple-card">
+                  <div className="flex flex-col gap-1 mb-8">
+                    <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                      基于 {(() => {
+                        const d = new Date();
+                        return `${d.getFullYear()}年${String(d.getMonth() + 1).padStart(2, '0')}月${String(d.getDate()).padStart(2, '0')}日`;
+                      })()} 大数据
+                    </div>
+                    <h3 className="text-2xl font-bold">📈 项目评分: {projectName || '未命名项目'}</h3>
                   </div>
-                  <h3 className="text-xl font-bold">📈 项目评分: {projectName || '未命名项目'}</h3>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                  {[{ l: "项目总分", k: "项目总分", ck: "总分简评" }, { l: "真需求", k: "真需求", ck: "真需求简评" }, { l: "获客效能", k: "获客效能", ck: "获客效能简评" }, { l: "声量", k: "声量", ck: "声量简评" }].map(m => {
-                    // 采用“渠道平权平均法”：先算各类别平均，再算总平均，避免单一渠道数量过多干扰总分
-                    const categories = Array.from(new Set(batchResults.map(r => r.媒体类型))).filter(c => c);
-                    if (categories.length === 0) return (
-                      <div key={m.l} className="st-metric shadow-sm border border-blue-50 flex flex-col">
-                        <div className="st-metric-label">{m.l}</div>
-                        <div className="st-metric-value">0.0/10</div>
-                      </div>
-                    );
-                    const categoryAverages = categories.map(cat => {
-                      const catResults = batchResults.filter(r => r.媒体类型 === cat);
-                      const sum = catResults.reduce((a, b) => a + parseFloat(b[m.k as keyof BatchResult] as string || "0"), 0);
-                      return sum / catResults.length;
-                    });
-                    const avgVal = categoryAverages.reduce((a, b) => a + b, 0) / categories.length;
-                    
-                    const comment = batchResults[0]?.[m.ck as keyof BatchResult] as string;
-                    return (
-                      <div key={m.l} className="st-metric shadow-sm border border-blue-50 flex flex-col">
-                        <div className="st-metric-label">{m.l}</div>
-                        <div className="flex items-baseline gap-2">
-                          <div className="st-metric-value">{avgVal.toFixed(1)}/10</div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10">
+                    {[{ l: "项目总分", k: "项目总分", ck: "总分简评" }, { l: "真需求", k: "真需求", ck: "真需求简评" }, { l: "获客效能", k: "获客效能", ck: "获客效能简评" }, { l: "声量", k: "声量", ck: "声量简评" }].map(m => {
+                      const categories = Array.from(new Set(batchResults.map(r => r.媒体类型))).filter(c => c);
+                      if (categories.length === 0) return (
+                        <div key={m.l} className="st-metric">
+                          <div className="st-metric-label">{m.l}</div>
+                          <div className="st-metric-value">0.0/10</div>
                         </div>
-                        {comment && (
-                          <div className="mt-2 pt-2 border-t border-blue-100 text-[10px] text-blue-600 italic leading-tight">
-                            AI 简评: {comment}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-6 w-full items-start">
-                  <div className="bg-white p-4 border rounded-xl shadow-sm min-h-[440px] flex flex-col overflow-hidden min-w-0">
-                    <p className="text-xs font-bold text-gray-400 mb-4 uppercase tracking-wider text-center">🕸️ 传播价值分布雷达</p>
-                    <div id="radar-chart" className="flex-1 w-full min-h-[380px]"></div>
+                      );
+                      const categoryAverages = categories.map(cat => {
+                        const catResults = batchResults.filter(r => r.媒体类型 === cat);
+                        const sum = catResults.reduce((a, b) => a + parseFloat(b[m.k as keyof BatchResult] as string || "0"), 0);
+                        return sum / catResults.length;
+                      });
+                      const avgVal = categoryAverages.reduce((a, b) => a + b, 0) / categories.length;
+                      
+                      const comment = batchResults[0]?.[m.ck as keyof BatchResult] as string;
+                      return (
+                        <div key={m.l} className="st-metric">
+                          <div className="st-metric-label">{m.l}</div>
+                          <div className="st-metric-value">{avgVal.toFixed(1)}/10</div>
+                          {comment && (
+                            <div className="mt-3 pt-3 border-t border-gray-100 text-[10px] text-gray-500 italic leading-tight">
+                              AI 简评: {comment}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div className="bg-white p-4 border rounded-xl shadow-sm min-h-[440px] flex flex-col overflow-hidden min-w-0">
-                    <p className="text-xs font-bold text-gray-400 mb-4 uppercase tracking-wider text-center">💠 媒体价值矩阵 (真需求 vs 声量)</p>
-                    <div id="scatter-chart" className="flex-1 w-full min-h-[380px]"></div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 pt-6 w-full items-start">
+                    <div className="bg-white p-6 border border-gray-100 rounded-2xl shadow-sm min-h-[440px] flex flex-col overflow-hidden min-w-0">
+                      <p className="text-[10px] font-bold text-gray-400 mb-6 uppercase tracking-widest text-center">🕸️ 传播价值分布雷达</p>
+                      <div id="radar-chart" className="flex-1 w-full min-h-[380px]"></div>
+                    </div>
+                    <div className="bg-white p-6 border border-gray-100 rounded-2xl shadow-sm min-h-[440px] flex flex-col overflow-hidden min-w-0">
+                      <p className="text-[10px] font-bold text-gray-400 mb-6 uppercase tracking-widest text-center">💠 媒体价值矩阵 (真需求 vs 声量)</p>
+                      <div id="scatter-chart" className="flex-1 w-full min-h-[380px]"></div>
+                    </div>
                   </div>
-                </div>
 
-                <div className="mt-10 animate-fadeIn">
-                   <h3 className="text-lg font-bold mb-4 flex items-center gap-2">🏆 媒体榜单</h3>
-                   <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                     <table className="w-full text-sm">
-                       <thead>
-                         <tr className="bg-gray-50 text-gray-600">
-                           <th className="py-3 px-4 text-center w-16 border-b">排名</th>
-                           <th className="py-3 px-4 text-left border-b">媒体名称</th>
-                           <th className="py-3 px-4 text-left border-b">标题</th>
-                           <th className="py-3 px-4 text-right border-b">评分</th>
-                         </tr>
-                       </thead>
-                       <tbody>
-                         {top10Results.map((item, idx) => (
-                           <tr key={idx} className="border-b hover:bg-gray-50 transition-colors">
-                             <td className="py-3 px-4 text-center font-bold">
-                               {idx === 0 ? <span className="text-yellow-500 text-lg">🥇</span> : idx === 1 ? <span className="text-gray-400 text-lg">🥈</span> : idx === 2 ? <span className="text-orange-400 text-lg">🥉</span> : idx + 1}
-                             </td>
-                             <td className="py-3 px-4 font-medium text-gray-800">{item.媒体名称}</td>
-                             <td className="py-3 px-4 text-gray-500 truncate max-w-[250px]" title={item.标题}>{item.标题}</td>
-                             <td className="py-3 px-4 text-right font-bold text-[#1E88E5]">{item.项目总分}</td>
-                           </tr>
-                         ))}
-                       </tbody>
-                     </table>
-                   </div>
-                </div>
+                  <div className="mt-12 animate-fadeIn">
+                    <h3 className="text-lg font-bold mb-6 flex items-center gap-2">🏆 媒体榜单</h3>
+                    <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-gray-50/50 text-gray-500">
+                            <th className="py-4 px-6 text-center w-20">排名</th>
+                            <th className="py-4 px-6 text-left">媒体名称</th>
+                            <th className="py-4 px-6 text-left">标题</th>
+                            <th className="py-4 px-6 text-right">评分</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {top10Results.map((item, idx) => (
+                            <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                              <td className="py-4 px-6 text-center font-bold">
+                                {idx === 0 ? <span className="text-yellow-500 text-xl">🥇</span> : idx === 1 ? <span className="text-gray-400 text-xl">🥈</span> : idx === 2 ? <span className="text-orange-400 text-xl">🥉</span> : idx + 1}
+                              </td>
+                              <td className="py-4 px-6 font-semibold text-gray-800">{item.媒体名称}</td>
+                              <td className="py-4 px-6 text-gray-500 truncate max-w-[300px]" title={item.标题}>{item.标题}</td>
+                              <td className="py-4 px-6 text-right font-bold text-blue-600">{item.项目总分}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
 
-                <div className="flex justify-center mt-12 mb-8 no-print">
-                  <button onClick={exportToPDF} className="st-button-primary px-10 py-3 rounded-full text-base shadow-lg hover:shadow-xl transform transition-all active:scale-95">📥 下载评分报告 (PDF)</button>
+                  <div className="flex justify-center mt-16 mb-8 no-print">
+                    <button onClick={exportToPDF} className="st-button-primary px-12 py-4 rounded-full text-base shadow-xl hover:shadow-2xl transform transition-all active:scale-95">📥 下载评分报告 (PDF)</button>
+                  </div>
                 </div>
               </div>
             )}
