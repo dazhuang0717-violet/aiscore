@@ -756,8 +756,8 @@ const App: React.FC = () => {
                     </div>
                     <h3 className="text-2xl font-bold">📈 项目评分: {projectName || '未命名项目'}</h3>
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10">
-                    {[{ l: "项目总分", k: "项目总分", ck: "总分简评" }, { l: "真需求", k: "真需求", ck: "真需求简评" }, { l: "获客效能", k: "获客效能", ck: "获客效能简评" }, { l: "声量", k: "声量", ck: "声量简评" }].map(m => {
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                    {[{ l: "项目总分", k: "项目总分", ck: "总分简评" }, { l: "真需求", k: "真需求", ck: "真需求简评" }, { l: "声量", k: "声量", ck: "声量简评" }].map(m => {
                       const categories = Array.from(new Set(batchResults.map(r => r.媒体类型))).filter(c => c);
                       if (categories.length === 0) return (
                         <div key={m.l} className="st-metric">
@@ -774,9 +774,9 @@ const App: React.FC = () => {
                       
                       const comment = batchResults[0]?.[m.ck as keyof BatchResult] as string;
                       return (
-                        <div key={m.l} className="st-metric">
-                          <div className="st-metric-label">{m.l}</div>
-                          <div className="st-metric-value">{avgVal.toFixed(1)}/10</div>
+                        <div key={m.l} className={`st-metric ${m.l === '项目总分' ? 'highlighted shadow-sm' : ''}`}>
+                          <div className={`st-metric-label ${m.l === '项目总分' ? 'text-blue-600 font-medium' : ''}`}>{m.l}</div>
+                          <div className={`st-metric-value ${m.l === '项目总分' ? 'text-blue-700' : ''}`}>{avgVal.toFixed(1)}/10</div>
                           {comment && (
                             <div className="mt-3 pt-3 border-t border-gray-100 text-[10px] text-gray-500 italic leading-tight">
                               AI 简评: {comment}
