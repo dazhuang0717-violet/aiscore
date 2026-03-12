@@ -77,11 +77,11 @@ ${content.substring(0, 5000)}`;
     audience_precision_score: { type: Type.NUMBER, description: "受众精准度得分 (1-10)，依据媒体名称评估" },
     tier_score: { type: Type.NUMBER, description: "媒体分级得分 (1-10)" },
     media_category: { type: Type.STRING, description: "媒体类型，必须从以下选项中选择：'网站', 'APP', '微信', '社交媒体'。注意：'社交媒体'仅指微博、小红书、抖音等平台账号；传统媒体官网、门户网站或新闻聚合平台（如今日头条、百家号）应归类为'网站'或'APP'。" },
-    one_sentence_summary: { type: Type.STRING, description: "简评 (100字以内)，必须包含该内容的优点和缺点，不要使用'优点：'或'缺点：'字样，直接描述内容并用分号分隔。" },
-    acquisition_comment: { type: Type.STRING, description: "针对获客效能设计的专项简评 (100字以内)，需包含优缺点，不使用'优点：'或'缺点：'字样，直接描述并用分号分隔。" },
-    true_demand_comment: { type: Type.STRING, description: "针对真需求（信息匹配+受众精准）的专项简评 (100字以内)，需包含优缺点，不使用'优点：'或'缺点：'字样，直接描述并用分号分隔。" },
-    volume_comment: { type: Type.STRING, description: "针对声量（传播质量+媒体分级）的专项简评 (100字以内)，需包含优缺点，不使用'优点：'或'缺点：'字样，直接描述并用分号分隔。" },
-    total_score_comment: { type: Type.STRING, description: "针对项目总分的综合简评 (100字以内)，需包含优缺点，不使用'优点：'或'缺点：'字样，直接描述并用分号分隔。" },
+    one_sentence_summary: { type: Type.STRING, description: "简评 (150字左右)，必须包含该内容的优点和缺点，不要使用'优点：'或'缺点：'字样，直接描述内容并用分号分隔。" },
+    acquisition_comment: { type: Type.STRING, description: "针对获客效能设计的专项简评 (150字左右)，需包含优缺点，不使用'优点：'或'缺点：'字样，直接描述并用分号分隔。" },
+    true_demand_comment: { type: Type.STRING, description: "针对真需求（信息匹配+受众精准）的专项简评 (150字左右)，需包含优缺点，不使用'优点：'或'缺点：'字样，直接描述并用分号分隔。" },
+    volume_comment: { type: Type.STRING, description: "针对声量（传播质量+媒体分级）的专项简评 (150字左右)，需包含优缺点，不使用'优点：'或'缺点：'字样，直接描述并用分号分隔。" },
+    total_score_comment: { type: Type.STRING, description: "针对项目总分的综合简评 (150字左右)，需包含优缺点，不使用'优点：'或'缺点：'字样，直接描述并用分号分隔。" },
     comment: { type: Type.STRING, description: "专业且详细的评分意见，必须包含该内容的优点和缺点，不要使用'优点：'或'缺点：'字样。" },
   };
 
@@ -193,7 +193,7 @@ ${itemsPrompt}
 3. audience_precision_score (1-10): 受众精准度得分
 4. tier_score (1-10): 媒体分级得分
 5. media_category: '网站', 'APP', '微信', '社交媒体' 之一
-6. one_sentence_summary: 简评 (100字以内)
+6. one_sentence_summary: 简评 (150字左右)
 7. acquisition_comment: 获客效能简评
 8. true_demand_comment: 真需求简评
 9. volume_comment: 声量简评
