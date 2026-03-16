@@ -52,8 +52,8 @@ const App: React.FC = () => {
     "媒体分级": true,
     "受众精准度": true,
     "传播质量": true,
-    "声量": true,
-    "简评": true,
+    "声量": false,
+    "简评": false,
     "项目总分": false, 
     "真需求": false,
     "获客效能": false,
@@ -61,7 +61,7 @@ const App: React.FC = () => {
   });
 
   const tiers: Tiers = {
-    tier1: "人民日报,新华社,央视,环球网,丁香园,医脉通,好医生,健康报",
+    tier1: "人民日报,新华社,央视,环球网,丁香园,医脉通,好医生,健康报,人民网,经济日报,光明日报",
     tier2: "腾讯,新浪,网易,搜狐,凤凰,澎湃,第一财经,医谷",
     tier3: "地方媒体,行业小报,其他"
   };
@@ -288,9 +288,7 @@ const App: React.FC = () => {
       "媒体类型": item["媒体类型"],
       "受众精准度": item["受众精准度"],
       "媒体分级": item["媒体分级"],
-      "传播质量": item["传播质量"],
-      "声量": item["声量"],
-      "简评": item["简评"]
+      "传播质量": item["传播质量"]
     }));
 
     const worksheet = window.XLSX.utils.json_to_sheet(filteredData);
@@ -497,7 +495,18 @@ const App: React.FC = () => {
           <label className="text-xs font-semibold text-gray-600 block mb-1">项目名称</label>
           <input value={projectName} onChange={e => setProjectName(e.target.value)} className="st-input" />
           <label className="text-xs font-semibold text-gray-600 block mb-1">核心信息 (Key Message)</label>
-          <input value={projectKeyMessage} onChange={e => setProjectKeyMessage(e.target.value)} className="st-input" />
+          <select 
+            value={projectKeyMessage} 
+            onChange={e => setProjectKeyMessage(e.target.value)} 
+            className="st-input appearance-none bg-white cursor-pointer"
+          >
+            <option value="">请选择核心信息...</option>
+            <option value="LC：让医生能够想象患者“从从容容”的未来。">1、LC：让医生能够想象患者“从从容容”的未来。</option>
+            <option value="HEMA：讲好“超越治愈”血液高质量发展的故事。">2、HEMA：讲好“超越治愈”血液高质量发展的故事。</option>
+            <option value="GIGU：讲好为中国肝癌患者搏一个“无瘤生存”机会的故事。">3、GIGU：讲好为中国肝癌患者搏一个“无瘤生存”机会的故事。</option>
+            <option value="BC：赫双妥：让皮下成为HER2+乳腺癌患者的标配，患者主动说我要。">4、BC：赫双妥：让皮下成为HER2+乳腺癌患者的标配，患者主动说我要。</option>
+            <option value="BC：伊那利塞：搭建“晚期一线精准化”的认知桥梁">5、BC：伊那利塞：搭建“晚期一线精准化”的认知桥梁</option>
+          </select>
           <label className="text-xs font-semibold text-gray-600 block mb-1">项目描述 (用于评估获客效能)</label>
           <textarea value={projectDesc} onChange={e => setProjectDesc(e.target.value)} className="st-input h-80 no-scrollbar" />
           <label className="text-xs font-semibold text-gray-600 block mb-2">目标受众模式 (可多选)</label>
