@@ -228,14 +228,25 @@ const App: React.FC = () => {
                 const volQuality = calculateVolumeQuality(views, interactions, aiRes.media_category);
                 const tierScore = aiRes.tier_score || 5;
                 
-                // 增加项目识别逻辑：针对标杆项目给予额外权重加成
-                const isRunForHer = (projectName || "").toLowerCase().includes("run for her") || (projectName || "").includes("她行");
-                const projectBoost = isRunForHer ? 0.8 : 0.4;
+                // 增加项目识别逻辑：针对低成本高影响力的公益/创意项目给予额外权重加成
+                const pName = (projectName || "").toLowerCase();
+                const pDesc = (projectDesc || "").toLowerCase();
+                
+                // 定义“高价值/低成本”关键词
+                const highValueKeywords = ["run for her", "她行", "公益", "海报", "患者", "创意", "宣教", "科普"];
+                // 定义“纯买量/高成本”关键词
+                const lowValueKeywords = ["医保", "落地", "购买", "硬广", "投放", "展会", "ciie", "进博会"];
+
+                const isHighValue = highValueKeywords.some(k => pName.includes(k) || pDesc.includes(k));
+                const isLowValue = lowValueKeywords.some(k => pName.includes(k) || pDesc.includes(k));
+
+                // 只有高价值且非纯买量的项目才获得加成
+                const projectBoost = (isHighValue && !isLowValue) ? 0.8 : 0.2;
 
                 // 恢复权重：回归 0.6/0.4 比例，侧重传播质量
                 const volTotal = Math.min(10, 0.6 * volQuality + 0.4 * tierScore + projectBoost);
                 const trueDemand = Math.min(10, 0.6 * aiRes.km_score + 0.4 * aiRes.audience_precision_score + projectBoost);
-                const totalScore = Math.min(10, (0.5 * trueDemand) + (0.2 * aiRes.acquisition_score) + (0.3 * volTotal) + (isRunForHer ? 0.5 : 0.2));
+                const totalScore = Math.min(10, (0.5 * trueDemand) + (0.2 * aiRes.acquisition_score) + (0.3 * volTotal) + (isHighValue ? 0.5 : 0));
 
                 return {
                   "标题": row['标题'] || row['Title'] || row['正文']?.substring(0, 20) || "无标题",
