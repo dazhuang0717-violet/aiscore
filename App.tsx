@@ -303,20 +303,33 @@ const App: React.FC = () => {
   const exportToPDF = () => {
     const element = document.getElementById('project-report-content');
     if (!element) return;
+    
+    // 优化 PDF 导出配置，使其适配纸张大小并保持高清晰度
     const opt = {
-      margin: [0.3, 0.3, 0.3, 0.3], // 稍微缩小边距以容纳更多内容
+      margin: [0.4, 0.2, 0.4, 0.2], // 稍微缩小边距以获得更大显示面积
       filename: `${projectName || '罗氏肿瘤传播分析'}_评分报告.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
+      image: { type: 'jpeg', quality: 1.0 },
       html2canvas: { 
-        scale: 2, 
+        scale: 3, // 提高缩放倍数，确保文字和图表极其清晰
         useCORS: true,
         logging: false,
-        letterRendering: true
+        letterRendering: true,
+        windowWidth: 1200, // 强制模拟 1200px 宽度，确保报告布局比例在 A4 纸上最协调
       },
-      jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] } // 优化分页，避免内容被截断
+      jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait', compress: true },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
     };
-    window.html2pdf().set(opt).from(element).save();
+
+    // 导出前临时隐藏下载按钮并添加导出类
+    const btn = element.querySelector('.no-print') as HTMLElement;
+    if (btn) btn.style.display = 'none';
+    document.body.classList.add('pdf-export-mode');
+
+    window.html2pdf().set(opt).from(element).save().then(() => {
+      // 导出完成后恢复按钮显示和样式
+      if (btn) btn.style.display = 'flex';
+      document.body.classList.remove('pdf-export-mode');
+    });
   };
 
   const analyzeAcquisitionEffectiveness = async () => {
