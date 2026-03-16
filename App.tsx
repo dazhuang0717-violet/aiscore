@@ -19,11 +19,12 @@ type SortConfig = {
 const App: React.FC = () => {
   // --- Configuration State ---
   const [projectName, setProjectName] = useState("");
-  const [projectKeyMessage, setProjectKeyMessage] = useState("");
+  const [projectKeyMessages, setProjectKeyMessages] = useState<string[]>([]);
   const [projectDesc, setProjectDesc] = useState("");
   const [audienceModes, setAudienceModes] = useState<AudienceMode[]>([AudienceMode.GENERAL]);
   
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isKMDropdownOpen, setIsKMDropdownOpen] = useState(false);
   
   // --- Sidebar Resize State ---
   const [sidebarWidth, setSidebarWidth] = useState(320);
@@ -151,7 +152,7 @@ const App: React.FC = () => {
       const result = await window.mammoth.extractRawText({ arrayBuffer });
       const fullText = result.value;
       if (fullText.trim().length < 10) throw new Error("文档内容过少。");
-      const aiRes = await analyzeWithGemini(fullText, audienceModes, projectKeyMessage, projectDesc, "", true);
+      const aiRes = await analyzeWithGemini(fullText, audienceModes, projectKeyMessages.join(" | "), projectDesc, "", true);
       setWordResult({ ...aiRes, textLen: fullText.length });
     } catch (err: any) {
       setErrorLog(err.message || "分析 Word 文档时出错");
@@ -214,7 +215,7 @@ const App: React.FC = () => {
             }));
 
             try {
-              const aiResults = await analyzeBatchWithGemini(batchInputs, audienceModes, projectKeyMessage, projectDesc);
+              const aiResults = await analyzeBatchWithGemini(batchInputs, audienceModes, projectKeyMessages.join(" | "), projectDesc);
               
               return batch.map((row, idx) => {
                 const aiRes = aiResults[idx] || { 
@@ -319,16 +320,16 @@ const App: React.FC = () => {
   };
 
   const analyzeAcquisitionEffectiveness = async () => {
-    if (!projectDesc || !projectKeyMessage) {
+    if (!projectDesc || projectKeyMessages.length === 0) {
       setErrorLog("请先在侧边栏填写项目描述和核心信息。");
       return;
     }
     setIsProcessing(true);
     try {
       const response = await analyzeWithGemini(
-        `请评估该项目的获客效能潜力。项目描述：${projectDesc}。核心信息：${projectKeyMessage}`,
+        `请评估该项目的获客效能潜力。项目描述：${projectDesc}。核心信息：${projectKeyMessages.join(" | ")}`,
         audienceModes,
-        projectKeyMessage,
+        projectKeyMessages.join(" | "),
         projectDesc,
         "项目整体"
       );
@@ -390,6 +391,7 @@ const App: React.FC = () => {
     if (window.confirm("确定要清空所有已分析的数据吗？")) {
       setWordResult(null);
       setBatchResults(null);
+      setProjectKeyMessages([]);
       setProgress(0);
       setErrorLog("");
     }
@@ -497,18 +499,69 @@ const App: React.FC = () => {
           <label className="text-xs font-semibold text-gray-600 block mb-1">项目名称</label>
           <input value={projectName} onChange={e => setProjectName(e.target.value)} className="st-input" />
           <label className="text-xs font-semibold text-gray-600 block mb-1">核心信息 (Key Message)</label>
-          <select 
-            value={projectKeyMessage} 
-            onChange={e => setProjectKeyMessage(e.target.value)} 
-            className="st-input appearance-none bg-white cursor-pointer"
-          >
-            <option value="">请选择核心信息...</option>
-            <option value="LC：让医生能够想象患者“从从容容”的未来。">1、LC：让医生能够想象患者“从从容容”的未来。</option>
-            <option value="HEMA：讲好“超越治愈”血液高质量发展的故事。">2、HEMA：讲好“超越治愈”血液高质量发展的故事。</option>
-            <option value="GIGU：讲好为中国肝癌患者搏一个“无瘤生存”机会的故事。">3、GIGU：讲好为中国肝癌患者搏一个“无瘤生存”机会的故事。</option>
-            <option value="BC：赫双妥：让皮下成为HER2+乳腺癌患者的标配，患者主动说我要。">4、BC：赫双妥：让皮下成为HER2+乳腺癌患者的标配，患者主动说我要。</option>
-            <option value="BC：伊那利塞：搭建“晚期一线精准化”的认知桥梁">5、BC：伊那利塞：搭建“晚期一线精准化”的认知桥梁</option>
-          </select>
+          <div className="relative mb-4">
+            <div 
+              onClick={() => setIsKMDropdownOpen(!isKMDropdownOpen)}
+              className={`st-input flex items-center justify-between bg-white cursor-pointer pr-4 mb-0 h-auto min-h-[46px] py-3 ${projectKeyMessages.length === 0 ? 'text-gray-400 text-[11px]' : 'text-sm'}`}
+            >
+              <div className="">
+                {projectKeyMessages.length > 0 ? (
+                  projectKeyMessages.length === 1 ? (
+                    (() => {
+                      const parts = projectKeyMessages[0].split('：');
+                      return (
+                        <>
+                          <span className="text-blue-600 font-bold">{parts[0]}</span>
+                          <span>：{parts.slice(1).join('：')}</span>
+                        </>
+                      );
+                    })()
+                  ) : `已选择 ${projectKeyMessages.length} 条核心信息`
+                ) : "请选择核心信息"}
+              </div>
+              <div className="text-gray-400 flex-shrink-0 ml-2">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className={`transform transition-transform ${isKMDropdownOpen ? 'rotate-180' : ''}`}><path d="M6 9l6 6 6-6"/></svg>
+              </div>
+            </div>
+            
+            {isKMDropdownOpen && (
+              <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-[110] animate-fadeIn">
+                {[
+                  "LC：让医生能够想象患者“从从容容”的未来。",
+                  "HEMA：讲好“超越治愈”血液高质量发展的故事。",
+                  "GIGU：讲好为中国肝癌患者搏一个“无瘤生存”机会的故事。",
+                  "BC：赫双妥：让皮下成为HER2+乳腺癌患者的标配，患者主动说我要。",
+                  "BC：伊那利塞：搭建“晚期一线精准化”的认知桥梁。"
+                ].map((opt, idx) => {
+                  const parts = opt.split('：');
+                  const isSelected = projectKeyMessages.includes(opt);
+                  return (
+                    <div 
+                      key={idx}
+                      onClick={() => {
+                        if (isSelected) {
+                          setProjectKeyMessages(projectKeyMessages.filter(m => m !== opt));
+                        } else {
+                          setProjectKeyMessages([...projectKeyMessages, opt]);
+                        }
+                      }}
+                      className={`px-4 py-3 text-xs hover:bg-blue-50 cursor-pointer border-b border-gray-50 last:border-0 transition-colors flex items-center justify-between ${isSelected ? 'bg-blue-50/50' : ''}`}
+                    >
+                      <div className="flex-1 mr-2 leading-relaxed">
+                        <span className="text-blue-600 font-bold">{parts[0]}</span>
+                        <span>：{parts.slice(1).join('：')}</span>
+                      </div>
+                      {isSelected && (
+                        <div className="text-blue-600 flex-shrink-0">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
           <label className="text-xs font-semibold text-gray-600 block mb-1">项目描述 (用于评估获客效能)</label>
           <textarea value={projectDesc} onChange={e => setProjectDesc(e.target.value)} className="st-input h-80 no-scrollbar" />
           <label className="text-xs font-semibold text-gray-600 block mb-2">目标受众模式 (可多选)</label>
