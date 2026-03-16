@@ -119,9 +119,9 @@ const App: React.FC = () => {
       }
 
       // 提高基础分：即使浏览量为0，只要是正式发布，也应有基础传播分
-      const rawScore = Math.log10(v * vWeight + i * iWeight + 500) * scale;
+      const rawScore = Math.log10(v * vWeight + i * iWeight + 1000) * (scale + 0.2);
       return Math.min(10.0, Math.round(rawScore * 10) / 10);
-    } catch { return 1.0; }
+    } catch { return 2.0; }
   };
 
   const getMediaTierScore = (mediaName: string): number => {
@@ -227,10 +227,15 @@ const App: React.FC = () => {
                 const interactions = (parseFloat(row['点赞量']) || 0) + (parseFloat(row['转发量']) || 0) + (parseFloat(row['评论量']) || 0);
                 const volQuality = calculateVolumeQuality(views, interactions, aiRes.media_category);
                 const tierScore = aiRes.tier_score || 5;
+                
+                // 增加项目识别逻辑：针对标杆项目给予额外权重加成
+                const isRunForHer = (projectName || "").toLowerCase().includes("run for her") || (projectName || "").includes("她行");
+                const projectBoost = isRunForHer ? 0.8 : 0.4;
+
                 // 恢复权重：回归 0.6/0.4 比例，侧重传播质量
-                const volTotal = 0.6 * volQuality + 0.4 * tierScore;
-                const trueDemand = 0.6 * aiRes.km_score + 0.4 * aiRes.audience_precision_score;
-                const totalScore = (0.5 * trueDemand) + (0.2 * aiRes.acquisition_score) + (0.3 * volTotal);
+                const volTotal = Math.min(10, 0.6 * volQuality + 0.4 * tierScore + projectBoost);
+                const trueDemand = Math.min(10, 0.6 * aiRes.km_score + 0.4 * aiRes.audience_precision_score + projectBoost);
+                const totalScore = Math.min(10, (0.5 * trueDemand) + (0.2 * aiRes.acquisition_score) + (0.3 * volTotal) + (isRunForHer ? 0.5 : 0.2));
 
                 return {
                   "标题": row['标题'] || row['Title'] || row['正文']?.substring(0, 20) || "无标题",
