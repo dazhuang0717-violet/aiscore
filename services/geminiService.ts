@@ -27,6 +27,7 @@ export const analyzeWithGemini = async (
 （1）真需求：评估内容是否“说对了话”且“找对了人”。
 - 核心信息匹配 (60%)：由AI评估文章内容与您设定的 [核心信息 (Key Message)] 的契合度。
 - 受众精准度 (40%)：由AI根据 [媒体名称] 和 [受众模式]，判断内容是否精准触达目标人群（大众/患者/HCP）。
+- 【特别注意】在没有“新闻稿”作为基准参考时，AI应根据 [待分析内容] 本身是否体现了核心信息的精髓进行判断。媒体报道往往会进行删减或改写，只要其传达了核心意图，就应给予合理的 [核心信息匹配] 分数，不要因为文字不完全一致而给出过低分数。
 
 （2）声量：评估内容的“传播力”和“影响力”。
 - 传播质量 (60%)：基于阅读量、点赞、转发、评论等真实数据计算出的质量分（此项由系统预计算，AI需参考整体内容质量给出评价）。
@@ -44,17 +45,19 @@ export const analyzeWithGemini = async (
 - 成本考量：Pitch 媒体（主动沟通获得的报道）由于投入成本相对较低，在获客效能上具有优势，通常可给予中等偏上分数（如 6-7 分）。
 - 场景与行为改变：评估项目是否成功进入医药场景（如医院、药店、线上诊疗），是否能有效引导目标患者和医生专家发生行为和观念的改变。
 - 转化潜力：评估项目通过不同市场策略和渠道吸引潜在客户并将其转化为实际消费者的逻辑潜力。该分数应完全取决于项目本身的获客设计。
+- 【特别注意】传统大型展会（如进博会 CIIE）虽然声量巨大，但由于其受众泛化、获客路径长且成本极高，其“获客效能”得分通常应保持在较低水平（如 3-5 分），除非项目描述中明确展示了极其高效的数字转化闭环。
 
 （4）受众精准度：对于媒体报道，受众精准度应主要依据 [媒体名称]（账号名称）进行判断。
 - 社交媒体（如微博、小红书、抖音等）由于其算法推荐和圈层属性，受众精准度通常偏高。
 - 垂类媒体（如丁香园、医脉通）针对专业人群，精准度极高。
 - 大众门户网站精准度相对较低。
 
-（5）项目类型评分参考（以此类推）：
-- 政策/医保落地类（如：高罗华医保落地）：通常发布于大量央媒/官媒，[媒体分级] 和 [声量] 应给高分。
-- 社交媒体运营类（如：从容生活计划）：通常发布于小红书/微博，[声量] 略低，但 [受众精准度] 和 [获客效能] 应给高分。
-- 传统展会类（如：进博会）：属于传统品牌展示，[获客效能] 相对较低。
-- 创意/公益宣教类（如：Run for Her Family）：具有高创意和互动性，[声量] 和 [获客效能] 通常都应给高分。
+（5）项目类型评分参考（必须拉开差距）：
+- 政策/医保落地/传统大型项目：[声量] 和 [媒体分级] 应给高分（8-10分），但 [获客效能] 应保持在较低水平（3-5分）。
+- 创意/社交媒体/运营类项目：[真需求]（信息匹配+受众精准）和 [获客效能] 应给高分（8-10分），但 [声量] 相对较低（4-6分）。
+- 传统展会类（如：进博会）：属于品牌展示，[声量] 高，[获客效能] 低。
+- 创意/公益宣教类：[声量] 和 [获客效能] 通常都应给高分。
+- 【重要】请在评分时更加果断，优秀项应大胆给 9-10 分，平庸项给 5-6 分，避免大量 7 分导致的平庸化。
 `;
 
   if (isNewsRelease) {
@@ -92,12 +95,12 @@ ${content.substring(0, 5000)}`;
     audience_precision_score: { type: Type.NUMBER, description: "受众精准度得分 (1-10)，依据媒体名称评估" },
     tier_score: { type: Type.NUMBER, description: "媒体分级得分 (1-10)" },
     media_category: { type: Type.STRING, description: "媒体类型，必须从以下选项中选择：'网站', 'APP', '微信', '社交媒体'。注意：'社交媒体'仅指微博、小红书、抖音等平台账号；传统媒体官网、门户网站或新闻聚合平台（如今日头条、百家号）应归类为'网站'或'APP'。" },
-    one_sentence_summary: { type: Type.STRING, description: "简评 (150字左右)，必须包含该内容的优点、缺点及改进建议，不要使用'优点：'、'缺点：'或'建议：'字样，直接描述内容并用分号分隔。" },
-    acquisition_comment: { type: Type.STRING, description: "针对获客效能设计的专项简评 (150字左右)，需包含优点、缺点及改进建议，不使用'优点：'、'缺点：'或'建议：'字样，直接描述并用分号分隔。" },
-    true_demand_comment: { type: Type.STRING, description: "针对真需求（信息匹配+受众精准）的专项简评 (150字左右)，需包含优点、缺点及改进建议，不使用'优点：'、'缺点：'或'建议：'字样，直接描述并用分号分隔。" },
-    volume_comment: { type: Type.STRING, description: "针对声量（传播质量+媒体分级）的专项简评 (150字左右)，需包含优点、缺点及改进建议，不使用'优点：'、'缺点：'或'建议：'字样，直接描述并用分号分隔。" },
-    total_score_comment: { type: Type.STRING, description: "针对项目总分的综合简评 (150字左右)，需包含优点、缺点及改进建议，不使用'优点：'、'缺点：'或'建议：'字样，直接描述并用分号分隔。" },
-    comment: { type: Type.STRING, description: "专业且详细的评分意见，必须包含该内容的优点、缺点及改进建议，不要使用'优点：'、'缺点：'或'建议：'字样。" },
+    one_sentence_summary: { type: Type.STRING, description: "简评 (150字左右)，包含优点、缺点及建议，用分号分隔，不使用'优点：'等字样。" },
+    acquisition_comment: { type: Type.STRING, description: "获客效能简评 (150字左右)，包含优点、缺点及建议，用分号分隔。" },
+    true_demand_comment: { type: Type.STRING, description: "真需求简评 (150字左右)，包含优点、缺点及建议，用分号分隔。" },
+    volume_comment: { type: Type.STRING, description: "声量简评 (150字左右)，包含优点、缺点及建议，用分号分隔。" },
+    total_score_comment: { type: Type.STRING, description: "总分简评 (150字左右)，包含优点、缺点及建议，用分号分隔。" },
+    comment: { type: Type.STRING, description: "详细评价 (200字以上)，包含优点、缺点及建议。" },
   };
 
   const required = [
@@ -204,6 +207,7 @@ export const analyzeBatchWithGemini = async (
 （1）真需求：评估内容是否“说对了话”且“找对了人”。
 - 核心信息匹配 (60%)：由AI评估文章内容与您设定的 [核心信息 (Key Message)] 的契合度。
 - 受众精准度 (40%)：由AI根据 [媒体名称] 和 [受众模式]，判断内容是否精准触达目标人群（大众/患者/HCP）。
+- 【特别注意】媒体报道往往会进行删减或改写，只要其传达了核心意图，就应给予合理的 [核心信息匹配] 分数，不要因为文字不完全一致而给出过低分数。
 
 （2）声量：评估内容的“传播力”和“影响力”。
 - 传播质量 (60%)：基于内容质量给出评价。
@@ -216,12 +220,14 @@ export const analyzeBatchWithGemini = async (
 （3）获客效能：由AI分析 [项目描述]，评估其获取每个单个客户而投入的总成本效率。
 - 成本考量：Pitch 媒体由于投入成本相对较低，在获客效能上具有优势（如 6-7 分）。
 - 场景与行为改变：评估项目是否成功进入医药场景，是否能有效引导目标患者和医生专家发生行为和观念的改变。
+- 【特别注意】传统大型展会（如进博会 CIIE）其“获客效能”得分通常应保持在较低水平（如 3-5 分），除非有明确的高效转化闭环。
 
-（4）项目类型评分参考（以此类推）：
-- 政策/医保落地类（如：高罗华医保落地）：通常发布于大量央媒/官媒，[媒体分级] 和 [声量] 应给高分。
-- 社交媒体运营类（如：从容生活计划）：通常发布于小红书/微博，[声量] 略低，但 [受众精准度] 和 [获客效能] 应给高分。
-- 传统展会类（如：进博会）：属于传统品牌展示，[获客效能] 相对较低。
-- 创意/公益宣教类（如：Run for Her Family）：具有高创意和互动性，[声量] 和 [获客效能] 通常都应给高分。
+（4）项目类型评分参考（必须拉开差距）：
+- 政策/医保落地/传统大型项目：[声量] 和 [媒体分级] 应给高分（8-10分），但 [获客效能] 应保持在较低水平（3-5分）。
+- 创意/社交媒体/运营类项目：[真需求]（信息匹配+受众精准）和 [获客效能] 应给高分（8-10分），但 [声量] 相对较低（4-6分）。
+- 传统展会类（如：进博会）：属于品牌展示，[声量] 高，[获客效能] 低。
+- 创意/公益宣教类：[声量] 和 [获客效能] 通常都应给高分。
+- 【重要】请在评分时更加果断，优秀项应大胆给 9-10 分，平庸项给 5-6 分，避免大量 7 分导致的平庸化。
 
 ${itemsPrompt}
 
@@ -234,11 +240,36 @@ ${itemsPrompt}
 4. tier_score (1-10): 媒体分级得分
 5. media_category: '网站', 'APP', '微信', '社交媒体' 之一
 6. one_sentence_summary: 简评 (150字左右，含优缺点及建议)
-7. acquisition_comment: 获客效能简评
-8. true_demand_comment: 真需求简评
-9. volume_comment: 声量简评
-10. total_score_comment: 总分简评
-11. comment: 详细评价`;
+7. acquisition_comment: 获客效能简评 (150字左右)
+8. true_demand_comment: 真需求简评 (150字左右)
+9. volume_comment: 声量简评 (150字左右)
+10. total_score_comment: 总分简评 (150字左右)
+11. comment: 详细评价 (200字以上)`;
+
+  const responseSchema = {
+    type: Type.ARRAY,
+    items: {
+      type: Type.OBJECT,
+      properties: {
+        km_score: { type: Type.NUMBER, description: "信息匹配得分 (1-10)" },
+        acquisition_score: { type: Type.NUMBER, description: "获客效能得分 (1-10)" },
+        audience_precision_score: { type: Type.NUMBER, description: "受众精准度得分 (1-10)" },
+        tier_score: { type: Type.NUMBER, description: "媒体分级得分 (1-10)" },
+        media_category: { type: Type.STRING, description: "媒体类型" },
+        one_sentence_summary: { type: Type.STRING, description: "简评 (150字左右)" },
+        acquisition_comment: { type: Type.STRING, description: "获客效能简评 (150字左右)" },
+        true_demand_comment: { type: Type.STRING, description: "真需求简评 (150字左右)" },
+        volume_comment: { type: Type.STRING, description: "声量简评 (150字左右)" },
+        total_score_comment: { type: Type.STRING, description: "总分简评 (150字左右)" },
+        comment: { type: Type.STRING, description: "详细评价 (200字以上)" }
+      },
+      required: [
+        "km_score", "acquisition_score", "audience_precision_score", "tier_score",
+        "media_category", "one_sentence_summary", "acquisition_comment",
+        "true_demand_comment", "volume_comment", "total_score_comment", "comment"
+      ]
+    }
+  };
 
   let retries = 3;
   let backoffMs = 2000;
@@ -250,27 +281,8 @@ ${itemsPrompt}
         contents: prompt,
         config: {
           responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                km_score: { type: Type.NUMBER },
-                acquisition_score: { type: Type.NUMBER },
-                audience_precision_score: { type: Type.NUMBER },
-                tier_score: { type: Type.NUMBER },
-                media_category: { type: Type.STRING },
-                one_sentence_summary: { type: Type.STRING },
-                acquisition_comment: { type: Type.STRING },
-                true_demand_comment: { type: Type.STRING },
-                volume_comment: { type: Type.STRING },
-                total_score_comment: { type: Type.STRING },
-                comment: { type: Type.STRING },
-              },
-              required: ["km_score", "acquisition_score", "audience_precision_score", "tier_score", "media_category", "one_sentence_summary", "comment"],
-            },
-          },
-        },
+          responseSchema: responseSchema
+        }
       });
 
       const text = response.text;
