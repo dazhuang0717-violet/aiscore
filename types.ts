@@ -12,6 +12,7 @@ export interface AIAnalysisResult {
   tier_score?: number;            // AI 判定的媒体分级
   target_audience_score?: number; // 目标受众评分 (仅新闻稿)
   readability_score?: number;     // 可读性评分 (仅新闻稿)
+  extracted_core_info?: string;   // AI 归纳的核心信息
   one_sentence_summary?: string;  // 简评
   acquisition_comment?: string;   // 获客效能专项简评
   true_demand_comment?: string;   // 真需求专项简评
@@ -34,6 +35,7 @@ export interface BatchResult {
   获客效能: number;
   声量: string;
   核心信息匹配: number;
+  归纳核心信息: string;
   受众精准度: number;
   媒体分级: number;
   传播质量: number;

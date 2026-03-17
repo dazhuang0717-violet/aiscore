@@ -19,8 +19,9 @@ type SortConfig = {
 const App: React.FC = () => {
   // --- Configuration State ---
   const [projectName, setProjectName] = useState("");
-  const [projectKeyMessages, setProjectKeyMessages] = useState<string[]>([]);
   const [projectDesc, setProjectDesc] = useState("");
+  const [supplementaryMaterials, setSupplementaryMaterials] = useState("");
+  const [supplementaryReview, setSupplementaryReview] = useState<{comment: string, km_score: number} | null>(null);
   const [audienceModes, setAudienceModes] = useState<AudienceMode[]>([AudienceMode.GENERAL]);
   
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -53,6 +54,7 @@ const App: React.FC = () => {
     "媒体分级": true,
     "受众精准度": true,
     "传播质量": true,
+    "归纳核心信息": false,
     "声量": false,
     "简评": false,
     "项目总分": false, 
@@ -67,7 +69,7 @@ const App: React.FC = () => {
     tier3: "地方媒体,行业小报,其他"
   };
 
-  const pickableColumns = ["标题", "媒体名称", "媒体分级", "受众精准度", "传播质量", "声量", "简评"];
+  const pickableColumns = ["标题", "媒体名称", "媒体分级", "受众精准度", "传播质量", "归纳核心信息", "声量", "简评"];
 
   const startResizing = useCallback(() => setIsResizing(true), []);
   const stopResizing = useCallback(() => setIsResizing(false), []);
@@ -141,6 +143,37 @@ const App: React.FC = () => {
     } catch { return null; }
   };
 
+  const handleSupplementaryFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsProcessing(true);
+    setErrorLog("");
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await window.mammoth.extractRawText({ arrayBuffer });
+      const fullText = result.value;
+      setSupplementaryMaterials(fullText);
+      
+      // 给出简评和真需求分数
+      const aiRes = await analyzeWithGemini(
+        `请对以下补充材料进行简评，并给出初步的“真需求”匹配分数。材料内容：${fullText}`,
+        audienceModes,
+        projectDesc,
+        "补充材料",
+        false,
+        ""
+      );
+      setSupplementaryReview({
+        comment: aiRes.one_sentence_summary || "已提取补充材料信息",
+        km_score: aiRes.km_score
+      });
+    } catch (err: any) {
+      setErrorLog("处理补充材料失败: " + err.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleWordFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -152,7 +185,7 @@ const App: React.FC = () => {
       const result = await window.mammoth.extractRawText({ arrayBuffer });
       const fullText = result.value;
       if (fullText.trim().length < 10) throw new Error("文档内容过少。");
-      const aiRes = await analyzeWithGemini(fullText, audienceModes, projectKeyMessages.join(" | "), projectDesc, "", true);
+      const aiRes = await analyzeWithGemini(fullText, audienceModes, projectDesc, "", true, supplementaryMaterials);
       setWordResult({ ...aiRes, textLen: fullText.length });
     } catch (err: any) {
       setErrorLog(err.message || "分析 Word 文档时出错");
@@ -215,12 +248,12 @@ const App: React.FC = () => {
             }));
 
             try {
-              const aiResults = await analyzeBatchWithGemini(batchInputs, audienceModes, projectKeyMessages.join(" | "), projectDesc);
+              const aiResults = await analyzeBatchWithGemini(batchInputs, audienceModes, projectDesc, supplementaryMaterials);
               
               return batch.map((row, idx) => {
                 const aiRes = aiResults[idx] || { 
                   km_score: 1, acquisition_score: 1, audience_precision_score: 1, tier_score: 5,
-                  comment: "分析失败", one_sentence_summary: "分析失败"
+                  comment: "分析失败", one_sentence_summary: "分析失败", extracted_core_info: "无"
                 };
                 
                 const views = row['浏览量'] || row['PV'] || 0;
@@ -265,6 +298,7 @@ const App: React.FC = () => {
                   "受众精准度": aiRes.audience_precision_score,
                   "媒体分级": tierScore,
                   "传播质量": volQuality,
+                  "归纳核心信息": aiRes.extracted_core_info || "无",
                   "评价": aiRes.comment,
                   "简评": aiRes.one_sentence_summary || "",
                   "获客效能简评": aiRes.acquisition_comment || "",
@@ -354,18 +388,19 @@ const App: React.FC = () => {
   };
 
   const analyzeAcquisitionEffectiveness = async () => {
-    if (!projectDesc || projectKeyMessages.length === 0) {
-      setErrorLog("请先在侧边栏填写项目描述和核心信息。");
+    if (!projectDesc) {
+      setErrorLog("请先在侧边栏填写项目描述。");
       return;
     }
     setIsProcessing(true);
     try {
       const response = await analyzeWithGemini(
-        `请评估该项目的获客效能潜力。项目描述：${projectDesc}。核心信息：${projectKeyMessages.join(" | ")}`,
+        `请评估该项目的获客效能潜力。项目描述：${projectDesc}。`,
         audienceModes,
-        projectKeyMessages.join(" | "),
         projectDesc,
-        "项目整体"
+        "项目整体",
+        false,
+        supplementaryMaterials
       );
       setAcquisitionProjectResult({
         score: response.acquisition_score,
@@ -425,7 +460,8 @@ const App: React.FC = () => {
     if (window.confirm("确定要清空所有已分析的数据吗？")) {
       setWordResult(null);
       setBatchResults(null);
-      setProjectKeyMessages([]);
+      setSupplementaryMaterials("");
+      setSupplementaryReview(null);
       setProgress(0);
       setErrorLog("");
     }
@@ -467,7 +503,7 @@ const App: React.FC = () => {
       // 散点图优化：增加随机抖动 (Jitter) 和 自定义 Hover 模板
       const scatterX = batchResults.map(d => parseFloat(d.声量) + (Math.random() - 0.5) * 0.3);
       const scatterY = batchResults.map(d => parseFloat(d.真需求) + (Math.random() - 0.5) * 0.3);
-      const hoverTexts = batchResults.map(d => `<b>${d.媒体名称}</b><br>标题: ${d.标题.substring(0,15)}...<br>总分: ${d.项目总分}<br>媒体分级: ${d.媒体分级}`);
+      const hoverTexts = batchResults.map(d => `<b>${d.媒体名称}</b><br>标题：${d.标题.substring(0,15)}...<br>总分：${d.项目总分}<br>媒体分级：${d.媒体分级}`);
 
       window.Plotly.newPlot('scatter-chart', [{
         x: scatterX, 
@@ -532,73 +568,10 @@ const App: React.FC = () => {
           <h3 className="text-sm font-bold mt-6 mb-2">📋 项目信息</h3>
           <label className="text-xs font-semibold text-gray-600 block mb-1">项目名称</label>
           <input value={projectName} onChange={e => setProjectName(e.target.value)} className="st-input" />
-          <label className="text-xs font-semibold text-gray-600 block mb-1">核心信息 (Key Message)</label>
-          <div className="relative mb-4">
-            <div 
-              onClick={() => setIsKMDropdownOpen(!isKMDropdownOpen)}
-              className={`st-input flex items-center justify-between bg-white cursor-pointer pr-4 mb-0 h-auto min-h-[46px] py-3 ${projectKeyMessages.length === 0 ? 'text-gray-400 text-[11px]' : 'text-sm'}`}
-            >
-              <div className="">
-                {projectKeyMessages.length > 0 ? (
-                  projectKeyMessages.length === 1 ? (
-                    (() => {
-                      const parts = projectKeyMessages[0].split('：');
-                      return (
-                        <>
-                          <span className="text-blue-600 font-bold">{parts[0]}</span>
-                          <span>：{parts.slice(1).join('：')}</span>
-                        </>
-                      );
-                    })()
-                  ) : `已选择 ${projectKeyMessages.length} 条核心信息`
-                ) : "请选择核心信息"}
-              </div>
-              <div className="text-gray-400 flex-shrink-0 ml-2">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className={`transform transition-transform ${isKMDropdownOpen ? 'rotate-180' : ''}`}><path d="M6 9l6 6 6-6"/></svg>
-              </div>
-            </div>
-            
-            {isKMDropdownOpen && (
-              <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-[110] animate-fadeIn">
-                {[
-                  "LC：让医生能够想象患者“从从容容”的未来。",
-                  "HEMA：讲好“超越治愈”血液高质量发展的故事。",
-                  "GIGU：讲好为中国肝癌患者搏一个“无瘤生存”机会的故事。",
-                  "BC：赫双妥：让皮下成为HER2+乳腺癌患者的标配，患者主动说我要。",
-                  "BC：伊那利塞：搭建“晚期一线精准化”的认知桥梁。"
-                ].map((opt, idx) => {
-                  const parts = opt.split('：');
-                  const isSelected = projectKeyMessages.includes(opt);
-                  return (
-                    <div 
-                      key={idx}
-                      onClick={() => {
-                        if (isSelected) {
-                          setProjectKeyMessages(projectKeyMessages.filter(m => m !== opt));
-                        } else {
-                          setProjectKeyMessages([...projectKeyMessages, opt]);
-                        }
-                      }}
-                      className={`px-4 py-3 text-xs hover:bg-blue-50 cursor-pointer border-b border-gray-50 last:border-0 transition-colors flex items-center justify-between ${isSelected ? 'bg-blue-50/50' : ''}`}
-                    >
-                      <div className="flex-1 mr-2 leading-relaxed">
-                        <span className="text-blue-600 font-bold">{parts[0]}</span>
-                        <span>：{parts.slice(1).join('：')}</span>
-                      </div>
-                      {isSelected && (
-                        <div className="text-blue-600 flex-shrink-0">
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-          <label className="text-xs font-semibold text-gray-600 block mb-1">项目描述 (用于评估获客效能)</label>
+          
+          <label className="text-xs font-semibold text-gray-600 block mb-1">项目描述（用于评估获客效能）</label>
           <textarea value={projectDesc} onChange={e => setProjectDesc(e.target.value)} className="st-input h-80 no-scrollbar" />
-          <label className="text-xs font-semibold text-gray-600 block mb-2">目标受众模式 (可多选)</label>
+          <label className="text-xs font-semibold text-gray-600 block mb-2">目标受众模式（可多选）</label>
           <div className="space-y-1 mb-6">
             {[AudienceMode.GENERAL, AudienceMode.PATIENT, AudienceMode.HCP].map(m => (
               <label key={m} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
@@ -630,7 +603,7 @@ const App: React.FC = () => {
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
         </button>
         <h1 className="text-lg sm:text-2xl md:text-4xl font-bold mb-6 whitespace-nowrap overflow-hidden text-ellipsis">📡 罗氏肿瘤领域-传播效能AI评分模型</h1>
-        {errorLog && <div className="st-alert st-error shadow-sm"><span>⚠️</span><div><div className="font-bold mb-1">系统错误:</div><div>{errorLog}</div></div></div>}
+        {errorLog && <div className="st-alert st-error shadow-sm"><span>⚠️</span><div><div className="font-bold mb-1">系统错误：</div><div>{errorLog}</div></div></div>}
 
         <div className="st-expander">
           <div className="st-expander-header" onClick={() => setIsExpanderOpen(!isExpanderOpen)}>
@@ -646,6 +619,7 @@ const App: React.FC = () => {
                   <div><span className="font-bold text-[#1E88E5]">声量</span> = 0.6 × 传播质量 + 0.4 × 媒体分级</div>
                 </div>
                 <div className="mt-4 text-xs md:text-sm text-gray-500 italic flex flex-col gap-1">
+                  <div>* 信息匹配：价值驱动的信息共鸣度，即目标受众是否能感受到明确获益。</div>
                   <div>* 获客效能：获取每个单个客户而投入的总成本效率，即能否高效地吸引潜在客户并转化为付费消费者。</div>
                   <div>* 传播质量 = Log10(阅读量 × 阅读权重 + 互动量 × 互动权重 + 10) × 灵敏度系数</div>
                 </div>
@@ -664,8 +638,9 @@ const App: React.FC = () => {
           <div className="animate-fadeIn">
             <div className="apple-card">
               <div className="st-alert st-info"><span>📄</span><div>上传新闻稿 Word 文档，AI 将评价核心信息传递情况。</div></div>
+              
               <div className="mb-6">
-                <label className="text-sm font-normal block mb-2 text-gray-700">上传 .docx 文件</label>
+                <label className="text-sm font-normal block mb-2 text-gray-700">上传待分析新闻稿（.docx）</label>
                 <div className="relative group">
                   <input type="file" accept=".docx" onChange={handleWordFile} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
                   <div className="st-input h-32 flex flex-col items-center justify-center border-dashed border-2 border-gray-200 group-hover:border-blue-400 transition-colors bg-gray-50/50 rounded-2xl">
@@ -674,13 +649,19 @@ const App: React.FC = () => {
                   </div>
                 </div>
               </div>
+
               {isProcessing && <div className="text-blue-600 font-bold mb-4 flex items-center gap-2 animate-pulse">⏳ AI 正在深度阅读文档...</div>}
               {wordResult && (
                 <div className="mt-8 border-t pt-8 animate-fadeIn">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    <div className="st-metric"><div className="st-metric-label">信息匹配度</div><div className="st-metric-value">{wordResult.km_score.toFixed(1)}/10</div></div>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                    <div className="st-metric"><div className="st-metric-label">信息共鸣度</div><div className="st-metric-value">{wordResult.km_score.toFixed(1)}/10</div></div>
+                    <div className="st-metric"><div className="st-metric-label">受众精准度</div><div className="st-metric-value">{(wordResult.audience_precision_score || 0).toFixed(1)}/10</div></div>
                     <div className="st-metric"><div className="st-metric-label">目标受众</div><div className="st-metric-value">{(wordResult.target_audience_score || 0).toFixed(1)}/10</div></div>
                     <div className="st-metric"><div className="st-metric-label">可读性</div><div className="st-metric-value">{(wordResult.readability_score || 0).toFixed(1)}/10</div></div>
+                  </div>
+                  <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                    <h4 className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-widest">归纳核心信息</h4>
+                    <p className="text-sm font-medium text-gray-800">{wordResult.extracted_core_info || "未提取"}</p>
                   </div>
                   <div className="bg-blue-50/50 border-l-4 border-[#0066cc] p-6 rounded-r-2xl shadow-sm">
                     <h4 className="font-bold text-[#0066cc] text-sm mb-3">💡 AI 简评</h4>
@@ -688,6 +669,26 @@ const App: React.FC = () => {
                   </div>
                 </div>
               )}
+
+              <div className="mt-12 p-6 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
+                <h4 className="text-sm font-bold mb-3 flex items-center gap-2">📎 上传补充材料（可选）</h4>
+                <p className="text-xs text-gray-500 mb-4">可以上传重要发言稿、采访提纲等补充文字材料 Word 文档，辅助 AI 计算项目总分。</p>
+                <div className="relative group">
+                  <input type="file" accept=".docx" onChange={handleSupplementaryFile} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+                  <div className="st-input h-20 flex flex-col items-center justify-center border-dashed border-2 border-gray-200 group-hover:border-blue-400 transition-colors bg-white rounded-xl">
+                    <span className="text-sm text-gray-500">{supplementaryMaterials ? "✅ 已上传补充材料" : "点击上传补充材料（.docx）"}</span>
+                  </div>
+                </div>
+                {supplementaryReview && (
+                  <div className="mt-4 p-4 bg-blue-50 rounded-xl border border-blue-100 animate-fadeIn">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-xs font-bold text-blue-700">AI 预审简评</span>
+                      <span className="text-xs font-bold text-blue-700">真需求预分：{supplementaryReview.km_score}/10</span>
+                    </div>
+                    <p className="text-xs text-gray-600 leading-relaxed">{supplementaryReview.comment}</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -710,7 +711,7 @@ const App: React.FC = () => {
                 <div className="mb-8 bg-blue-50/50 p-6 rounded-2xl border border-blue-100 shadow-sm animate-fadeIn">
                   <div className="flex justify-between items-center mb-3">
                     <span className="text-sm font-bold text-blue-700 flex items-center gap-2">
-                      <span className="animate-spin">⏳</span> AI 正在深度分析中... ({batchResults?.length || 0} / {Math.round((batchResults?.length || 0) / (progress/100 || 1)) || '?'})
+                      <span className="animate-spin">⏳</span> AI 正在深度分析中... （{batchResults?.length || 0} / {Math.round((batchResults?.length || 0) / (progress/100 || 1)) || '？'}）
                     </span>
                     <div className="flex items-center gap-4">
                       <span className="text-sm font-bold text-blue-700">{progress}%</span>
@@ -757,6 +758,7 @@ const App: React.FC = () => {
                             {visibleColumns["媒体分级"] && <th onClick={() => requestSort('媒体分级')} className="cursor-pointer hover:text-blue-600 transition-colors w-[10%]">媒体分级</th>}
                             {visibleColumns["受众精准度"] && <th onClick={() => requestSort('受众精准度')} className="cursor-pointer hover:text-blue-600 transition-colors w-[10%]">受众精准度</th>}
                             {visibleColumns["传播质量"] && <th onClick={() => requestSort('传播质量')} className="cursor-pointer hover:text-blue-600 transition-colors w-[10%]">传播质量</th>}
+                            {visibleColumns["归纳核心信息"] && <th onClick={() => requestSort('归纳核心信息')} className="cursor-pointer hover:text-blue-600 transition-colors w-[15%]">归纳核心信息</th>}
                             {visibleColumns["声量"] && <th onClick={() => requestSort('声量')} className="font-bold cursor-pointer hover:text-blue-600 transition-colors text-blue-600 w-[10%]">声量</th>}
                             {visibleColumns["简评"] && <th className="w-[33%]">简评</th>}
                           </tr>
@@ -783,6 +785,7 @@ const App: React.FC = () => {
                                     {visibleColumns["媒体分级"] && <td className="text-gray-600">{Number(r.媒体分级).toFixed(1)}/10</td>}
                                     {visibleColumns["受众精准度"] && <td className="text-gray-600">{Number(r.受众精准度).toFixed(1)}/10</td>}
                                     {visibleColumns["传播质量"] && <td className="text-gray-600">{Number(r.传播质量).toFixed(1)}/10</td>}
+                                    {visibleColumns["归纳核心信息"] && <td className="text-gray-600 truncate" title={r.归纳核心信息}>{r.归纳核心信息}</td>}
                                     {visibleColumns["声量"] && <td className="font-bold text-blue-600">{Number(r.声量).toFixed(1)}/10</td>}
                                     {visibleColumns["简评"] && <td className="text-gray-500 italic leading-relaxed whitespace-normal text-xs">{r.简评}</td>}
                                   </tr>
@@ -852,7 +855,7 @@ const App: React.FC = () => {
                         return `${d.getFullYear()}年${String(d.getMonth() + 1).padStart(2, '0')}月${String(d.getDate()).padStart(2, '0')}日`;
                       })()} 大数据
                     </div>
-                    <h3 className="text-2xl font-bold">📈 项目评分: {projectName || '未命名项目'}</h3>
+                    <h3 className="text-2xl font-bold">📈 项目评分：{projectName || '未命名项目'}</h3>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
                     {[{ l: "项目总分", k: "项目总分", ck: "总分简评" }, { l: "真需求", k: "真需求", ck: "真需求简评" }, { l: "声量", k: "声量", ck: "声量简评" }].map(m => {
@@ -877,7 +880,7 @@ const App: React.FC = () => {
                           <div className={`st-metric-value ${m.l === '项目总分' ? 'text-blue-700' : ''}`}>{avgVal.toFixed(1)}/10</div>
                           {comment && (
                             <div className="mt-3 pt-3 border-t border-gray-100 text-[10px] text-gray-500 italic leading-tight">
-                              AI 简评: {comment}
+                              AI 简评： {comment}
                             </div>
                           )}
                         </div>
@@ -891,7 +894,7 @@ const App: React.FC = () => {
                       <div id="radar-chart" className="flex-1 w-full min-h-[380px]"></div>
                     </div>
                     <div className="bg-white p-6 border border-gray-100 rounded-2xl shadow-sm min-h-[440px] flex flex-col overflow-hidden min-w-0">
-                      <p className="text-[10px] font-bold text-gray-400 mb-6 uppercase tracking-widest text-center">💠 媒体价值矩阵 (真需求 vs 声量)</p>
+                      <p className="text-[10px] font-bold text-gray-400 mb-6 uppercase tracking-widest text-center">💠 媒体价值矩阵（真需求 vs 声量）</p>
                       <div id="scatter-chart" className="flex-1 w-full min-h-[380px]"></div>
                     </div>
                   </div>
@@ -925,7 +928,7 @@ const App: React.FC = () => {
                   </div>
 
                   <div className="flex justify-center mt-16 mb-8 no-print">
-                    <button onClick={exportToPDF} className="st-button-primary px-12 py-4 rounded-full text-base shadow-xl hover:shadow-2xl transform transition-all active:scale-95">📥 下载评分报告 (PDF)</button>
+                    <button onClick={exportToPDF} className="st-button-primary px-12 py-4 rounded-full text-base shadow-xl hover:shadow-2xl transform transition-all active:scale-95">📥 下载评分报告（PDF）</button>
                   </div>
                 </div>
               </div>
