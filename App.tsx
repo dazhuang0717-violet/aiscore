@@ -268,21 +268,24 @@ const App: React.FC = () => {
                 // 定义“高价值/低成本”关键词
                 const highValueKeywords = ["run for her", "她行", "公益", "海报", "患者", "创意", "宣教", "科普"];
                 // 定义“纯买量/高成本”关键词
-                const lowValueKeywords = ["医保", "落地", "购买", "硬广", "投放", "展会", "ciie", "进博会"];
+                const lowValueKeywords = ["医保", "落地", "购买", "硬广", "投放", "展会", "ciie", "进博会", "从容生活"];
                 // 定义“信息聚焦”关键词 (LC/GIGU)
-                const focusedKeywords = ["lc", "肺癌", "gigu", "肝癌", "无瘤生存", "从容未来"];
+                const focusedKeywords = ["lc", "肺癌", "gigu", "肝癌", "无瘤生存"];
+                // 针对“从容生活”进行特殊处理，降低其声量加成
+                const isCongrong = pName.includes("从容生活") || pDesc.includes("从容生活");
 
                 const isHighValue = highValueKeywords.some(k => pName.includes(k) || pDesc.includes(k));
-                const isLowValue = lowValueKeywords.some(k => pName.includes(k) || pDesc.includes(k));
+                const isLowValue = lowValueKeywords.some(k => pName.includes(k) || pDesc.includes(k)) || isCongrong;
                 const isFocused = focusedKeywords.some(k => pName.includes(k) || pDesc.includes(k));
 
                 // 只有高价值且非纯买量的项目才获得加成
                 const projectBoost = (isHighValue && !isLowValue) ? 2.5 : 0.2;
                 // 针对 LC/GIGU 给予额外的信息聚焦加成
-                const focusBoost = isFocused ? 0.8 : 0;
+                const focusBoost = (isFocused && !isCongrong) ? 0.8 : 0;
 
                 // 恢复权重：回归 0.6/0.4 比例，侧重传播质量
-                const volTotal = Math.min(10, 0.6 * volQuality + 0.4 * tierScore + projectBoost);
+                let volTotal = Math.min(10, 0.6 * volQuality + 0.4 * tierScore + projectBoost);
+                if (isCongrong) volTotal = Math.min(10, volTotal * 0.7); // 额外降低从容生活的声量分数
                 const trueDemand = Math.min(10, 0.6 * aiRes.km_score + 0.4 * aiRes.audience_precision_score + projectBoost + focusBoost);
                 
                 // 提高 Run for Her 等高价值项目的获客效能加成

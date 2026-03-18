@@ -31,7 +31,7 @@ export const analyzeWithGemini = async (
      * 肺癌患者：少副作用、长生存（如阿来替尼）。
      * 血液患者：少花钱、活下去。
      * 普适需求：医保为患者省钱。
-     * 评分参考：Run for Her、医保落地、肺癌真实生活计划等项目应得极高分（9.5-10分）；信息点过于分散或泛化的项目（如某些乳腺癌进博会报道）应得低分。得分需拉开差距。对于 Run for Her，其真需求分数必须在 9.8 以上。
+     * 评分参考：Run for Her、医保落地等项目应得极高分（9.5-10分）；信息点过于分散或泛化的项目（如某些乳腺癌进博会报道）应得低分。得分需拉开差距。对于 Run for Her，其真需求分数必须在 9.8 以上。
    - 受众精准 (40%)：
      * 场景触达：日间诊室张贴海报（100%触达） > 药房。
      * 平台机制：小红书推流机制对目标患者的触达通常比线下活动更精准。
@@ -55,7 +55,7 @@ export const analyzeWithGemini = async (
 - 合规建议：严禁提出“导流”或任何违反医药合规的建议。请代之以“加强患者教育”、“提升学术深度”、“优化渠道选择”等专业建议。
 - 真实可信：不要使用“分数定位到中等区间”等表述。评价应专业、犀利、有洞察力。
 - 核心信息归纳：请通过阅读新闻稿，归纳出一句核心信息（15-30字）。
-- 简评格式要求：简评（one_sentence_summary）以及各维度的简评（如获客效能简评、真需求简评等）均必须包含该传播项的“优点”、“缺点”及“改进建议”，字数控制在150字左右。
+- 简评格式要求：简评（one_sentence_summary）以及各维度的简评（如获客效能简评、真需求简评、总分简评等）均必须包含该传播项的“优点”、“缺点”及“改进建议”，字数控制在150字左右。
 
 项目背景：
 - 媒体名称: ${mediaName || (isNewsRelease ? "待发布新闻稿" : "未知媒体")}
@@ -78,7 +78,7 @@ ${content.substring(0, 5000)}`;
     acquisition_comment: { type: Type.STRING, description: "获客效能简评" },
     true_demand_comment: { type: Type.STRING, description: "真需求简评" },
     volume_comment: { type: Type.STRING, description: "声量简评" },
-    total_score_comment: { type: Type.STRING, description: "总分简评" },
+    total_score_comment: { type: Type.STRING, description: "总分简评，必须包含优点、缺点及建议" },
     comment: { type: Type.STRING, description: "详细评价 (200字以上)" },
   };
 
@@ -180,7 +180,7 @@ export const analyzeBatchWithGemini = async (
      * 肺癌患者：少副作用、长生存。
      * 血液患者：少花钱、活下去。
      * 普适需求：医保为患者省钱。
-     * 评分参考：Run for Her、医保落地、肺癌真实生活计划等项目应得极高分（9.5-10分）；信息点过于分散或泛化的项目（如某些乳腺癌进博会报道）应得低分。得分需拉开差距。对于 Run for Her，其真需求分数必须在 9.8 以上。
+     * 评分参考：Run for Her、医保落地等项目应得极高分（9.5-10分）；信息点过于分散或泛化的项目（如某些乳腺癌进博会报道）应得低分。得分需拉开差距。对于 Run for Her，其真需求分数必须在 9.8 以上。
    - 受众精准 (40%)：
      * 场景触达：日间诊室张贴海报（100%触达） > 药房。
      * 平台机制：小红书推流机制对目标患者的触达通常比线下活动更精准。
@@ -198,7 +198,7 @@ export const analyzeBatchWithGemini = async (
 - 合规建议：严禁提出“导流”或任何违反医药合规的建议。请代之以“加强患者教育”、“提升学术深度”、“优化渠道选择”等专业建议。
 - 真实可信：不要使用“分数定位到中等区间”等表述。评价应专业、犀利、有洞察力。
 - 核心信息归纳：请通过阅读新闻稿，归纳出一句核心信息（15-30字）。
-- 简评格式要求：每个传播项的简评（one_sentence_summary）以及各维度的简评均必须包含“优点”、“缺点”及“改进建议”，字数控制在150字左右。
+- 简评格式要求：每个传播项的简评（one_sentence_summary）以及各维度的简评（如获客效能简评、真需求简评、总分简评等）均必须包含“优点”、“缺点”及“改进建议”，字数控制在150字左右。
 
 ${itemsPrompt}
 
@@ -215,7 +215,7 @@ ${itemsPrompt}
 8. acquisition_comment: 获客效能简评
 9. true_demand_comment: 真需求简评
 10. volume_comment: 声量简评
-11. total_score_comment: 总分简评
+11. total_score_comment: 总分简评 (150字左右，必须包含优点、缺点及建议)
 12. comment: 详细评价 (200字以上)`;
 
   const responseSchema = {
@@ -233,7 +233,7 @@ ${itemsPrompt}
         acquisition_comment: { type: Type.STRING, description: "获客效能简评 (150字左右)" },
         true_demand_comment: { type: Type.STRING, description: "真需求简评 (150字左右)" },
         volume_comment: { type: Type.STRING, description: "声量简评 (150字左右)" },
-        total_score_comment: { type: Type.STRING, description: "总分简评 (150字左右)" },
+        total_score_comment: { type: Type.STRING, description: "总分简评 (150字左右)，必须包含优点、缺点及建议" },
         comment: { type: Type.STRING, description: "详细评价 (200字以上)" }
       },
       required: [
