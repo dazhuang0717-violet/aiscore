@@ -20,11 +20,11 @@ export const analyzeWithGemini = async (
   const ai = new GoogleGenAI({ apiKey });
   
   let prompt = `你是一个专业的罗氏肿瘤领域公关传播分析师。请基于以下项目背景进行评分。
-你的目标是评估项目的“价值驱动的信息共鸣度”（Value-Driven Message Resonance）。
+你的目标是评估项目的“信息匹配”（Information Matching）。
 
 评分维度定义：
 1. 真需求 (50%)：评估内容是否“说对了话”且“找对了人”。
-   - 价值驱动的信息共鸣度 (60%)：综合新闻稿核心内容、项目描述及补充材料，分析项目是否能让目标受众感到明确获益。
+   - 信息匹配 (60%)：项目传递信息能否使目标受众共鸣并感到明确获益。
      * 医生需求：学术突破（如伊那利塞新药）、提高患者满意度、提升口碑。
      * 院管需求：省钱、省床位（如皮下疗法减少治疗时间）。
      * 乳腺癌患者：生活质量（如皮下疗法）。
@@ -32,7 +32,7 @@ export const analyzeWithGemini = async (
      * 血液患者：少花钱、活下去。
      * 普适需求：医保为患者省钱。
      * 评分参考：Run for Her、医保落地、肺癌真实生活计划等项目应得高分（9-10分）；信息点过于分散或泛化的项目（如某些乳腺癌进博会报道）应得低分。得分需拉开差距。
-   - 受众精准度 (40%)：
+   - 受众精准 (40%)：
      * 场景触达：日间诊室张贴海报（100%触达） > 药房。
      * 平台机制：小红书推流机制对目标患者的触达通常比线下活动更精准。
      * 垂类媒体（丁香园、医脉通）对HCP精准度极高。
@@ -41,15 +41,19 @@ export const analyzeWithGemini = async (
    - 传播质量 (60%)：基于真实数据或内容质量。
    - 媒体分级 (40%)：官媒央媒/优质大V/优质垂类为 Tier 1 (9-10分)。
 
-3. 获客效能 (20%)：评估获取单个客户的投入总成本效率。
-   - 低成本高影响力项目（海报、患者关爱、低成本社媒、Pitch媒体）应给极高分（9-10分）。
+3. 获客效能 (20%)：计算获取每个新客户需投入的成本，得出项目能否高效吸引并转化潜在客户。
+   - 低成本高影响力项目（海报、患者关爱、低成本社媒、Pitch媒体、Run for Her等）应给极高分（9-10分）。
    - 纯买量项目（硬广、传统大型展会）应给低分（2-4分），除非有高效转化闭环。
+
+4. 可读性 (额外维度)：评估内容的易读性、逻辑性及吸引力。
+   - 针对新闻稿，评估其是否通俗易懂，逻辑是否清晰，是否能吸引目标受众阅读。
 
 【评价要求】
 - 整体评价：从项目整体去评价，不要聚焦到某一个媒体，不要提到具体报纸或媒体的名字。
 - 合规建议：严禁提出“导流”或任何违反医药合规的建议。请代之以“加强患者教育”、“提升学术深度”、“优化渠道选择”等专业建议。
 - 真实可信：不要使用“分数定位到中等区间”等表述。评价应专业、犀利、有洞察力。
 - 核心信息归纳：请通过阅读新闻稿，归纳出一句核心信息（15-30字）。
+- 简评格式要求：简评（one_sentence_summary）以及各维度的简评（如获客效能简评、真需求简评等）均必须包含该传播项的“优点”、“缺点”及“改进建议”，字数控制在150字左右。
 
 项目背景：
 - 媒体名称: ${mediaName || (isNewsRelease ? "待发布新闻稿" : "未知媒体")}
@@ -61,13 +65,14 @@ export const analyzeWithGemini = async (
 ${content.substring(0, 5000)}`;
 
   const properties: any = {
-    km_score: { type: Type.NUMBER, description: "价值驱动的信息共鸣度得分 (1-10)" },
-    acquisition_score: { type: Type.NUMBER, description: "获客效能得分 (1-10)" },
-    audience_precision_score: { type: Type.NUMBER, description: "受众精准度得分 (1-10)" },
-    tier_score: { type: Type.NUMBER, description: "媒体分级得分 (1-10)" },
+    km_score: { type: Type.NUMBER, description: "信息匹配得分" },
+    acquisition_score: { type: Type.NUMBER, description: "获客效能得分" },
+    audience_precision_score: { type: Type.NUMBER, description: "受众精准得分" },
+    readability_score: { type: Type.NUMBER, description: "可读性得分" },
+    tier_score: { type: Type.NUMBER, description: "媒体分级得分" },
     media_category: { type: Type.STRING, description: "媒体类型 ('网站', 'APP', '微信', '社交媒体')" },
     extracted_core_info: { type: Type.STRING, description: "从稿件中归纳出的核心信息 (一句)" },
-    one_sentence_summary: { type: Type.STRING, description: "简评 (150字左右)，不提具体媒体名，不提导流" },
+    one_sentence_summary: { type: Type.STRING, description: "简评 (150字左右)，必须包含优点、缺点及建议，不提具体媒体名，不提导流" },
     acquisition_comment: { type: Type.STRING, description: "获客效能简评" },
     true_demand_comment: { type: Type.STRING, description: "真需求简评" },
     volume_comment: { type: Type.STRING, description: "声量简评" },
@@ -76,16 +81,14 @@ ${content.substring(0, 5000)}`;
   };
 
   const required = [
-    "km_score", "acquisition_score", "audience_precision_score", "tier_score",
+    "km_score", "acquisition_score", "audience_precision_score", "readability_score", "tier_score",
     "media_category", "extracted_core_info", "one_sentence_summary", 
     "acquisition_comment", "true_demand_comment", "volume_comment",
     "total_score_comment", "comment"
   ];
 
   if (isNewsRelease) {
-    properties.target_audience_score = { type: Type.NUMBER, description: "目标受众得分 (1-10)" };
-    properties.readability_score = { type: Type.NUMBER, description: "可读性得分 (1-10)" };
-    required.push("target_audience_score", "readability_score");
+    // 新闻稿评分去掉目标受众和可读性
   }
 
   let retries = 5;
@@ -159,7 +162,7 @@ export const analyzeBatchWithGemini = async (
 
   const prompt = `你是一个专业的罗氏肿瘤领域公关传播分析师。
 请对以下 ${items.length} 个传播项进行批量评分。
-你的目标是评估项目的“价值驱动的信息共鸣度”（Value-Driven Message Resonance）。
+你的目标是评估项目的“信息匹配”（Information Matching）。
 
 项目背景：
 - 受众模式: ${audienceModes.join(", ")}
@@ -168,7 +171,7 @@ export const analyzeBatchWithGemini = async (
 
 评分维度定义：
 1. 真需求 (50%)：评估内容是否“说对了话”且“找对了人”。
-   - 价值驱动的信息共鸣度 (60%)：综合新闻稿核心内容、项目描述及补充材料，分析项目是否能让目标受众感到明确获益。
+   - 信息匹配 (60%)：项目传递信息能否使目标受众共鸣并感到明确获益。
      * 医生需求：学术突破、提高患者满意度、提升口碑。
      * 院管需求：省钱、省床位。
      * 乳腺癌患者：生活质量。
@@ -176,7 +179,7 @@ export const analyzeBatchWithGemini = async (
      * 血液患者：少花钱、活下去。
      * 普适需求：医保为患者省钱。
      * 评分参考：Run for Her、医保落地、肺癌真实生活计划等项目应得高分（9-10分）；信息点过于分散或泛化的项目（如某些乳腺癌进博会报道）应得低分。得分需拉开差距。
-   - 受众精准度 (40%)：
+   - 受众精准 (40%)：
      * 场景触达：日间诊室张贴海报（100%触达） > 药房。
      * 平台机制：小红书推流机制对目标患者的触达通常比线下活动更精准。
 
@@ -184,8 +187,8 @@ export const analyzeBatchWithGemini = async (
    - 传播质量 (60%)：基于内容质量。
    - 媒体分级 (40%)：官媒央媒/优质大V/优质垂类为 Tier 1 (9-10分)。
 
-3. 获客效能 (20%)：评估获取单个客户的投入总成本效率。
-   - 低成本高影响力项目应给极高分（9-10分）。
+3. 获客效能 (20%)：计算获取每个新客户需投入的成本，得出项目能否高效吸引并转化潜在客户。
+   - 低成本高影响力项目（如 Run for Her）应给极高分（9-10分）。
    - 纯买量项目应给低分（2-4分）。
 
 【评价要求】
@@ -193,19 +196,20 @@ export const analyzeBatchWithGemini = async (
 - 合规建议：严禁提出“导流”或任何违反医药合规的建议。请代之以“加强患者教育”、“提升学术深度”、“优化渠道选择”等专业建议。
 - 真实可信：不要使用“分数定位到中等区间”等表述。评价应专业、犀利、有洞察力。
 - 核心信息归纳：请通过阅读新闻稿，归纳出一句核心信息（15-30字）。
+- 简评格式要求：每个传播项的简评（one_sentence_summary）以及各维度的简评均必须包含“优点”、“缺点”及“改进建议”，字数控制在150字左右。
 
 ${itemsPrompt}
 
 评分规则与输出要求：
 请为每个待分析项返回一个 JSON 对象，结果必须是一个包含 ${items.length} 个对象的数组。
 每个对象必须包含以下字段：
-1. km_score (1-10): 价值驱动的信息共鸣度得分
-2. acquisition_score (1-10): 获客效能得分
-3. audience_precision_score (1-10): 受众精准度得分
-4. tier_score (1-10): 媒体分级得分
+1. km_score: 信息匹配得分
+2. acquisition_score: 获客效能得分
+3. audience_precision_score: 受众精准得分
+4. tier_score: 媒体分级得分
 5. media_category: '网站', 'APP', '微信', '社交媒体' 之一
 6. extracted_core_info: 从稿件中归纳出的核心信息 (一句)
-7. one_sentence_summary: 简评 (150字左右，含优缺点及建议，不提具体媒体名，不提导流)
+7. one_sentence_summary: 简评 (150字左右，必须包含优点、缺点及建议，不提具体媒体名，不提导流)
 8. acquisition_comment: 获客效能简评
 9. true_demand_comment: 真需求简评
 10. volume_comment: 声量简评
@@ -217,13 +221,13 @@ ${itemsPrompt}
     items: {
       type: Type.OBJECT,
       properties: {
-        km_score: { type: Type.NUMBER, description: "价值驱动的信息共鸣度得分 (1-10)" },
-        acquisition_score: { type: Type.NUMBER, description: "获客效能得分 (1-10)" },
-        audience_precision_score: { type: Type.NUMBER, description: "受众精准度得分 (1-10)" },
-        tier_score: { type: Type.NUMBER, description: "媒体分级得分 (1-10)" },
+        km_score: { type: Type.NUMBER, description: "信息匹配得分" },
+        acquisition_score: { type: Type.NUMBER, description: "获客效能得分" },
+        audience_precision_score: { type: Type.NUMBER, description: "受众精准得分" },
+        tier_score: { type: Type.NUMBER, description: "媒体分级得分" },
         media_category: { type: Type.STRING, description: "媒体类型" },
         extracted_core_info: { type: Type.STRING, description: "归纳出的核心信息" },
-        one_sentence_summary: { type: Type.STRING, description: "简评 (150字左右)" },
+        one_sentence_summary: { type: Type.STRING, description: "简评 (150字左右)，必须包含优点、缺点及建议" },
         acquisition_comment: { type: Type.STRING, description: "获客效能简评 (150字左右)" },
         true_demand_comment: { type: Type.STRING, description: "真需求简评 (150字左右)" },
         volume_comment: { type: Type.STRING, description: "声量简评 (150字左右)" },

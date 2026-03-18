@@ -52,7 +52,7 @@ const App: React.FC = () => {
     "标题": true,
     "媒体名称": true,
     "媒体分级": true,
-    "受众精准度": true,
+    "受众精准": true,
     "传播质量": true,
     "归纳核心信息": false,
     "声量": false,
@@ -69,7 +69,7 @@ const App: React.FC = () => {
     tier3: "地方媒体,行业小报,其他"
   };
 
-  const pickableColumns = ["标题", "媒体名称", "媒体分级", "受众精准度", "传播质量", "归纳核心信息", "声量", "简评"];
+  const pickableColumns = ["标题", "媒体名称", "媒体分级", "受众精准", "传播质量", "归纳核心信息", "声量", "简评"];
 
   const startResizing = useCallback(() => setIsResizing(true), []);
   const stopResizing = useCallback(() => setIsResizing(false), []);
@@ -121,7 +121,7 @@ const App: React.FC = () => {
       }
 
       // 提高基础分：即使浏览量为0，只要是正式发布，也应有基础传播分
-      const rawScore = Math.log10(v * vWeight + i * iWeight + 1000) * (scale + 0.2);
+      const rawScore = Math.log10(v * vWeight + i * iWeight + 10) * (scale + 0.2);
       return Math.min(10.0, Math.round(rawScore * 10) / 10);
     } catch { return 2.0; }
   };
@@ -154,9 +154,9 @@ const App: React.FC = () => {
       const fullText = result.value;
       setSupplementaryMaterials(fullText);
       
-      // 给出简评和真需求分数
+      // 给出简评和信息匹配分数
       const aiRes = await analyzeWithGemini(
-        `请对以下补充材料进行简评，并给出初步的“真需求”匹配分数。材料内容：${fullText}`,
+        `请对以下补充材料内容本身进行简评，并给出初步的“信息匹配”分数。材料内容：${fullText}`,
         audienceModes,
         projectDesc,
         "补充材料",
@@ -277,14 +277,17 @@ const App: React.FC = () => {
                 const isFocused = focusedKeywords.some(k => pName.includes(k) || pDesc.includes(k));
 
                 // 只有高价值且非纯买量的项目才获得加成
-                const projectBoost = (isHighValue && !isLowValue) ? 0.8 : 0.2;
+                const projectBoost = (isHighValue && !isLowValue) ? 1.5 : 0.2;
                 // 针对 LC/GIGU 给予额外的信息聚焦加成
                 const focusBoost = isFocused ? 0.5 : 0;
 
                 // 恢复权重：回归 0.6/0.4 比例，侧重传播质量
                 const volTotal = Math.min(10, 0.6 * volQuality + 0.4 * tierScore + projectBoost);
                 const trueDemand = Math.min(10, 0.6 * aiRes.km_score + 0.4 * aiRes.audience_precision_score + projectBoost + focusBoost);
-                const totalScore = Math.min(10, (0.5 * trueDemand) + (0.2 * aiRes.acquisition_score) + (0.3 * volTotal) + (isHighValue ? 0.5 : 0));
+                
+                // 提高 Run for Her 等高价值项目的获客效能加成
+                const acquisitionScore = isHighValue ? Math.min(10, aiRes.acquisition_score + 2.0) : aiRes.acquisition_score;
+                const totalScore = Math.min(10, (0.5 * trueDemand) + (0.2 * acquisitionScore) + (0.3 * volTotal) + (isHighValue ? 1.0 : 0));
 
                 return {
                   "标题": row['标题'] || row['Title'] || row['正文']?.substring(0, 20) || "无标题",
@@ -292,10 +295,11 @@ const App: React.FC = () => {
                   "媒体类型": aiRes.media_category || "网站",
                   "项目总分": totalScore.toFixed(1),
                   "真需求": trueDemand.toFixed(1),
-                  "获客效能": aiRes.acquisition_score,
+                  "获客效能": acquisitionScore,
                   "声量": volTotal.toFixed(1),
                   "核心信息匹配": aiRes.km_score,
-                  "受众精准度": aiRes.audience_precision_score,
+                  "受众精准": aiRes.audience_precision_score,
+                  "可读性": aiRes.readability_score || 0,
                   "媒体分级": tierScore,
                   "传播质量": volQuality,
                   "归纳核心信息": aiRes.extracted_core_info || "无",
@@ -344,7 +348,7 @@ const App: React.FC = () => {
       "标题": item["标题"],
       "媒体名称": item["媒体名称"],
       "媒体类型": item["媒体类型"],
-      "受众精准度": item["受众精准度"],
+      "受众精准": item["受众精准"],
       "媒体分级": item["媒体分级"],
       "传播质量": item["传播质量"]
     }));
@@ -395,7 +399,7 @@ const App: React.FC = () => {
     setIsProcessing(true);
     try {
       const response = await analyzeWithGemini(
-        `请评估该项目的获客效能潜力。项目描述：${projectDesc}。`,
+        `请评估该项目的整体获客效能潜力。项目描述：${projectDesc}。简评内容必须包含该项目的“优点”、“缺点”及“改进建议”，字数控制在150字左右。`,
         audienceModes,
         projectDesc,
         "项目整体",
@@ -478,13 +482,13 @@ const App: React.FC = () => {
         batchResults.reduce((a, b) => a + parseFloat(b[key] as string || "0"), 0) / batchResults.length;
       
       const radarData = [
-        avg('核心信息匹配'), avg('获客效能'), avg('受众精准度'), avg('媒体分级'), avg('传播质量')
+        avg('核心信息匹配'), avg('获客效能'), avg('受众精准'), avg('媒体分级'), avg('传播质量')
       ];
 
       window.Plotly.newPlot('radar-chart', [{
         type: 'scatterpolar', 
         r: [...radarData, radarData[0]],
-        theta: ['核心信息匹配', '获客效能', '受众精准度', '媒体分级', '传播质量', '核心信息匹配'],
+        theta: ['核心信息匹配', '获客效能', '受众精准', '媒体分级', '传播质量', '核心信息匹配'],
         fill: 'toself', 
         line: { color: '#1E88E5', width: 2 }, 
         fillcolor: 'rgba(30, 136, 229, 0.3)',
@@ -615,13 +619,13 @@ const App: React.FC = () => {
               <div className="text-center text-sm md:text-lg leading-loose flex flex-col gap-2">
                 <div><span className="font-bold text-[#1E88E5]">总分</span> = 0.5 × 真需求 + 0.2 × 获客效能 + 0.3 × 声量</div>
                 <div className="flex flex-col md:flex-row justify-center md:gap-8">
-                  <div><span className="font-bold text-[#1E88E5]">真需求</span> = 0.6 × 信息匹配 + 0.4 × 受众精准度</div>
+                  <div><span className="font-bold text-[#1E88E5]">真需求</span> = 0.6 × 信息匹配 + 0.4 × 受众精准</div>
                   <div><span className="font-bold text-[#1E88E5]">声量</span> = 0.6 × 传播质量 + 0.4 × 媒体分级</div>
                 </div>
                 <div className="mt-4 text-xs md:text-sm text-gray-500 italic flex flex-col gap-1">
-                  <div>* 信息匹配：价值驱动的信息共鸣度，即目标受众是否能感受到明确获益。</div>
-                  <div>* 获客效能：获取每个单个客户而投入的总成本效率，即能否高效地吸引潜在客户并转化为付费消费者。</div>
-                  <div>* 传播质量 = Log10(阅读量 × 阅读权重 + 互动量 × 互动权重 + 10) × 灵敏度系数</div>
+                  <div>* 信息匹配：项目传递信息能否使目标受众共鸣并感到明确获益</div>
+                  <div>* 获客效能：计算获取每个新客户需投入的成本，得出项目能否高效吸引并转化潜在客户</div>
+                  <div>* 传播质量 = Log10(阅读量 × 阅读权重 + 互动量 × 互动权重 + 10) × 系数</div>
                 </div>
               </div>
             </div>
@@ -654,10 +658,10 @@ const App: React.FC = () => {
               {wordResult && (
                 <div className="mt-8 border-t pt-8 animate-fadeIn">
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                    <div className="st-metric"><div className="st-metric-label">信息共鸣度</div><div className="st-metric-value">{wordResult.km_score.toFixed(1)}/10</div></div>
-                    <div className="st-metric"><div className="st-metric-label">受众精准度</div><div className="st-metric-value">{(wordResult.audience_precision_score || 0).toFixed(1)}/10</div></div>
-                    <div className="st-metric"><div className="st-metric-label">目标受众</div><div className="st-metric-value">{(wordResult.target_audience_score || 0).toFixed(1)}/10</div></div>
-                    <div className="st-metric"><div className="st-metric-label">可读性</div><div className="st-metric-value">{(wordResult.readability_score || 0).toFixed(1)}/10</div></div>
+                    <div className="st-metric"><div className="st-metric-label">信息匹配</div><div className="st-metric-value">{wordResult.km_score.toFixed(1)}</div></div>
+                    <div className="st-metric"><div className="st-metric-label">受众精准</div><div className="st-metric-value">{(wordResult.audience_precision_score || 0).toFixed(1)}</div></div>
+                    <div className="st-metric"><div className="st-metric-label">获客效能</div><div className="st-metric-value">{(wordResult.acquisition_score || 0).toFixed(1)}</div></div>
+                    <div className="st-metric"><div className="st-metric-label">可读性</div><div className="st-metric-value">{(wordResult.readability_score || 0).toFixed(1)}</div></div>
                   </div>
                   <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
                     <h4 className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-widest">归纳核心信息</h4>
@@ -682,8 +686,8 @@ const App: React.FC = () => {
                 {supplementaryReview && (
                   <div className="mt-4 p-4 bg-blue-50 rounded-xl border border-blue-100 animate-fadeIn">
                     <div className="flex justify-between items-center mb-2">
-                      <span className="text-xs font-bold text-blue-700">AI 预审简评</span>
-                      <span className="text-xs font-bold text-blue-700">真需求预分：{supplementaryReview.km_score}/10</span>
+                      <span className="text-xs font-bold text-blue-700">AI 简评</span>
+                      <span className="text-xs font-bold text-blue-700">信息匹配：{supplementaryReview.km_score}/10</span>
                     </div>
                     <p className="text-xs text-gray-600 leading-relaxed">{supplementaryReview.comment}</p>
                   </div>
@@ -711,7 +715,7 @@ const App: React.FC = () => {
                 <div className="mb-8 bg-blue-50/50 p-6 rounded-2xl border border-blue-100 shadow-sm animate-fadeIn">
                   <div className="flex justify-between items-center mb-3">
                     <span className="text-sm font-bold text-blue-700 flex items-center gap-2">
-                      <span className="animate-spin">⏳</span> AI 正在深度分析中... （{batchResults?.length || 0} / {Math.round((batchResults?.length || 0) / (progress/100 || 1)) || '？'}）
+                      <span className="animate-spin">⏳</span> AI 正在深度分析中... （{batchResults?.length || 0} ／ {Math.round((batchResults?.length || 0) / (progress/100 || 1)) || '？'}）
                     </span>
                     <div className="flex items-center gap-4">
                       <span className="text-sm font-bold text-blue-700">{progress}%</span>
@@ -756,7 +760,7 @@ const App: React.FC = () => {
                             {visibleColumns["标题"] && <th onClick={() => requestSort('标题')} className="cursor-pointer hover:text-blue-600 transition-colors w-[15%]">标题</th>}
                             {visibleColumns["媒体名称"] && <th onClick={() => requestSort('媒体名称')} className="cursor-pointer hover:text-blue-600 transition-colors w-[12%]">媒体名称</th>}
                             {visibleColumns["媒体分级"] && <th onClick={() => requestSort('媒体分级')} className="cursor-pointer hover:text-blue-600 transition-colors w-[10%]">媒体分级</th>}
-                            {visibleColumns["受众精准度"] && <th onClick={() => requestSort('受众精准度')} className="cursor-pointer hover:text-blue-600 transition-colors w-[10%]">受众精准度</th>}
+                            {visibleColumns["受众精准"] && <th onClick={() => requestSort('受众精准')} className="cursor-pointer hover:text-blue-600 transition-colors w-[10%]">受众精准</th>}
                             {visibleColumns["传播质量"] && <th onClick={() => requestSort('传播质量')} className="cursor-pointer hover:text-blue-600 transition-colors w-[10%]">传播质量</th>}
                             {visibleColumns["归纳核心信息"] && <th onClick={() => requestSort('归纳核心信息')} className="cursor-pointer hover:text-blue-600 transition-colors w-[15%]">归纳核心信息</th>}
                             {visibleColumns["声量"] && <th onClick={() => requestSort('声量')} className="font-bold cursor-pointer hover:text-blue-600 transition-colors text-blue-600 w-[10%]">声量</th>}
@@ -782,11 +786,11 @@ const App: React.FC = () => {
                                   <tr key={`${category}-${i}`} className="hover:bg-blue-50/30 transition-colors">
                                     {visibleColumns["标题"] && <td className="truncate font-medium" title={r.标题}>{r.标题}</td>}
                                     {visibleColumns["媒体名称"] && <td className="truncate text-gray-600">{r.媒体名称}</td>}
-                                    {visibleColumns["媒体分级"] && <td className="text-gray-600">{Number(r.媒体分级).toFixed(1)}/10</td>}
-                                    {visibleColumns["受众精准度"] && <td className="text-gray-600">{Number(r.受众精准度).toFixed(1)}/10</td>}
-                                    {visibleColumns["传播质量"] && <td className="text-gray-600">{Number(r.传播质量).toFixed(1)}/10</td>}
+                                    {visibleColumns["媒体分级"] && <td className="text-gray-600">{Number(r.媒体分级).toFixed(1)}</td>}
+                                    {visibleColumns["受众精准"] && <td className="text-gray-600">{Number(r.受众精准).toFixed(1)}</td>}
+                                    {visibleColumns["传播质量"] && <td className="text-gray-600">{Number(r.传播质量).toFixed(1)}</td>}
                                     {visibleColumns["归纳核心信息"] && <td className="text-gray-600 truncate" title={r.归纳核心信息}>{r.归纳核心信息}</td>}
-                                    {visibleColumns["声量"] && <td className="font-bold text-blue-600">{Number(r.声量).toFixed(1)}/10</td>}
+                                    {visibleColumns["声量"] && <td className="font-bold text-blue-600">{Number(r.声量).toFixed(1)}</td>}
                                     {visibleColumns["简评"] && <td className="text-gray-500 italic leading-relaxed whitespace-normal text-xs">{r.简评}</td>}
                                   </tr>
                                 ))}
@@ -823,7 +827,7 @@ const App: React.FC = () => {
                 <div className="animate-fadeIn">
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
                     <div className="st-metric md:col-span-1">
-                      <div className="st-metric-label">获客效能潜力</div>
+                    <div className="st-metric-label">获客效能潜力</div>
                       <div className="st-metric-value text-blue-600">{acquisitionProjectResult.score.toFixed(1)}/10</div>
                     </div>
                     <div className="md:col-span-3 bg-blue-50/50 p-6 rounded-2xl border border-blue-100">
