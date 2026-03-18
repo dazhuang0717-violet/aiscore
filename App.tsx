@@ -188,7 +188,11 @@ const App: React.FC = () => {
       const aiRes = await analyzeWithGemini(fullText, audienceModes, projectDesc, "", true, supplementaryMaterials);
       setWordResult({ ...aiRes, textLen: fullText.length });
     } catch (err: any) {
-      setErrorLog(err.message || "分析 Word 文档时出错");
+      let msg = err.message || "分析 Word 文档时出错";
+      if (msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED") || msg.includes("Quota exceeded")) {
+        msg = "Gemini API 额度已耗尽 (429)。请稍后再试，或检查 API Key 的账单状态。";
+      }
+      setErrorLog(msg);
     } finally {
       setIsProcessing(false);
     }
@@ -215,7 +219,7 @@ const App: React.FC = () => {
         const json = window.XLSX.utils.sheet_to_json(sheet) as any[];
         
         const batchSize = 5; // 每 5 条数据打包成一个 API 请求
-        const concurrency = 4; // 同时进行 4 个 API 请求 (即同时处理 20 条数据)
+        const concurrency = 2; // 同时进行 2 个 API 请求 (即同时处理 10 条数据)
         const results: BatchResult[] = [];
         const totalRows = json.length;
 
@@ -288,8 +292,14 @@ const App: React.FC = () => {
                 if (isCongrong) volTotal = Math.min(10, volTotal * 0.7); // 额外降低从容生活的声量分数
                 const trueDemand = Math.min(10, 0.6 * aiRes.km_score + 0.4 * aiRes.audience_precision_score + projectBoost + focusBoost);
                 
-                // 提高 Run for Her 等高价值项目的获客效能加成
-                const acquisitionScore = isHighValue ? Math.min(10, aiRes.acquisition_score + 2.0) : aiRes.acquisition_score;
+                // 提高 Run for Her 等高价值项目的获客效能加成，降低进博会等高成本项目的获客效能
+                let acquisitionScore = aiRes.acquisition_score;
+                if (isHighValue && !isLowValue) {
+                  acquisitionScore = Math.min(10, acquisitionScore + 2.0);
+                } else if (isLowValue) {
+                  acquisitionScore = Math.max(1.0, acquisitionScore - 3.5); // 显著降低高成本项目的获客效能
+                }
+                
                 const totalScore = Math.min(10, (0.5 * trueDemand) + (0.2 * acquisitionScore) + (0.3 * volTotal) + (isHighValue ? 1.0 : 0));
 
                 return {
@@ -316,11 +326,15 @@ const App: React.FC = () => {
               });
             } catch (e: any) {
               console.error("Batch error:", e);
+              let errorMsg = e.message || "未知错误";
+              if (errorMsg.includes("429") || errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("Quota exceeded")) {
+                errorMsg = "API 额度已耗尽 (429)，请稍后再试。";
+              }
               return batch.map(row => ({
                 "标题": row['标题'] || "分析失败",
                 "媒体名称": row['媒体名称'] || "未知",
                 "项目总分": "0.0",
-                "评价": `AI分析失败: ${e.message}`
+                "评价": `AI分析失败: ${errorMsg}`
               } as any));
             }
           });
@@ -335,7 +349,7 @@ const App: React.FC = () => {
           
           // 组间稍微休息，避免触发全局速率限制
           if (results.length < totalRows) {
-            await new Promise(res => setTimeout(res, 800));
+            await new Promise(res => setTimeout(res, 1500));
           }
         }
       } catch (err: any) { setErrorLog("Excel 处理错误: " + err.message); } finally { setIsProcessing(false); }
@@ -414,7 +428,11 @@ const App: React.FC = () => {
         comment: response.acquisition_comment || response.one_sentence_summary || "评估完成"
       });
     } catch (err: any) {
-      setErrorLog("获客效能分析失败: " + err.message);
+      let msg = err.message || "获客效能分析失败";
+      if (msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED") || msg.includes("Quota exceeded")) {
+        msg = "API 额度已耗尽 (429)，请稍后再试。";
+      }
+      setErrorLog(msg);
     } finally {
       setIsProcessing(false);
     }
@@ -469,6 +487,7 @@ const App: React.FC = () => {
       setBatchResults(null);
       setSupplementaryMaterials("");
       setSupplementaryReview(null);
+      setAcquisitionProjectResult(null);
       setProgress(0);
       setErrorLog("");
     }
@@ -719,8 +738,9 @@ const App: React.FC = () => {
                     <span className="text-sm font-bold text-blue-700 flex items-center gap-2">
                       <span className="animate-spin">⏳</span> AI 正在深度分析中... （{batchResults?.length || 0} ／ {Math.round((batchResults?.length || 0) / (progress/100 || 1)) || '？'}）
                     </span>
-                    <div className="flex items-center gap-4">
+                    <div className="flex flex-col items-end">
                       <span className="text-sm font-bold text-blue-700">{progress}%</span>
+                      <span className="text-[10px] text-blue-400 mt-1">正在应用速率控制以确保稳定性</span>
                     </div>
                   </div>
                   <div className="w-full bg-gray-200 h-2.5 rounded-full overflow-hidden shadow-inner">

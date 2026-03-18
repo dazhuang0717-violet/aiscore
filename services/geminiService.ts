@@ -43,7 +43,7 @@ export const analyzeWithGemini = async (
 
 3. 获客效能 (20%)：计算获取每个新客户需投入的成本，得出项目能否高效吸引并转化潜在客户。
    - 低成本高影响力项目（海报、患者关爱、低成本社媒、Pitch媒体、Run for Her等）应给极高分（9-10分）。
-   - 纯买量项目（硬广、传统大型展会）应给低分（2-4分），除非有高效转化闭环。
+   - 纯买量项目（硬广、传统大型展会如进博会/CIIE）应给低分（2-4分），除非有高效转化闭环。进博会这种高成本、低精准触达的项目，获客效能应在 3.5 分以下。
    - 注意：针对新闻稿评分，此维度不计入最终考量，但仍需返回一个占位分数。
 
 4. 可读性 (额外维度)：评估内容的易读性、逻辑性及吸引力。
@@ -191,7 +191,7 @@ export const analyzeBatchWithGemini = async (
 
 3. 获客效能 (20%)：计算获取每个新客户需投入的成本，得出项目能否高效吸引并转化潜在客户。
    - 低成本高影响力项目（如 Run for Her）应给极高分（9-10分）。
-   - 纯买量项目应给低分（2-4分）。
+   - 纯买量项目（如进博会、CIIE、硬广）应给低分（2-4分）。进博会这种高成本项目，获客效能应在 3.5 分以下。
 
 【评价要求】
 - 整体评价：从项目整体去评价，不要聚焦到某一个媒体，不要提到具体报纸或媒体的名字。
@@ -244,8 +244,8 @@ ${itemsPrompt}
     }
   };
 
-  let retries = 3;
-  let backoffMs = 2000;
+  let retries = 5;
+  let backoffMs = 3000;
 
   while (retries >= 0) {
     try {
@@ -270,12 +270,23 @@ ${itemsPrompt}
         total_score_comment: r.total_score_comment || r.one_sentence_summary || "待评估",
       }));
     } catch (e: any) {
-      if (retries > 0) {
+      const errorMsg = e.message || "";
+      const isRateLimit = errorMsg.includes("429") || errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("Quota exceeded");
+      
+      if (isRateLimit && retries > 0) {
+        console.log(`批量分析命中频率限制，正在进行第 ${6 - retries} 次重试，等待 ${backoffMs}ms...`);
         await delay(backoffMs);
         retries--;
         backoffMs *= 2;
         continue;
       }
+
+      if (retries > 0 && (errorMsg.includes("500") || errorMsg.includes("503"))) {
+        await delay(1000);
+        retries--;
+        continue;
+      }
+
       throw e;
     }
   }
