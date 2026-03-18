@@ -277,9 +277,9 @@ const App: React.FC = () => {
                 const isFocused = focusedKeywords.some(k => pName.includes(k) || pDesc.includes(k));
 
                 // 只有高价值且非纯买量的项目才获得加成
-                const projectBoost = (isHighValue && !isLowValue) ? 1.5 : 0.2;
+                const projectBoost = (isHighValue && !isLowValue) ? 2.5 : 0.2;
                 // 针对 LC/GIGU 给予额外的信息聚焦加成
-                const focusBoost = isFocused ? 0.5 : 0;
+                const focusBoost = isFocused ? 0.8 : 0;
 
                 // 恢复权重：回归 0.6/0.4 比例，侧重传播质量
                 const volTotal = Math.min(10, 0.6 * volQuality + 0.4 * tierScore + projectBoost);
@@ -660,7 +660,6 @@ const App: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                     <div className="st-metric"><div className="st-metric-label">信息匹配</div><div className="st-metric-value">{wordResult.km_score.toFixed(1)}</div></div>
                     <div className="st-metric"><div className="st-metric-label">受众精准</div><div className="st-metric-value">{(wordResult.audience_precision_score || 0).toFixed(1)}</div></div>
-                    <div className="st-metric"><div className="st-metric-label">获客效能</div><div className="st-metric-value">{(wordResult.acquisition_score || 0).toFixed(1)}</div></div>
                     <div className="st-metric"><div className="st-metric-label">可读性</div><div className="st-metric-value">{(wordResult.readability_score || 0).toFixed(1)}</div></div>
                   </div>
                   <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
