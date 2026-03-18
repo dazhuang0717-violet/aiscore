@@ -275,7 +275,9 @@ const App: React.FC = () => {
                 const lowValueKeywords = ["医保", "落地", "购买", "硬广", "投放", "展会", "ciie", "进博会", "从容生活"];
                 // 定义“信息聚焦”关键词 (LC/GIGU)
                 const focusedKeywords = ["lc", "肺癌", "gigu", "肝癌", "无瘤生存"];
-                // 针对“从容生活”进行特殊处理，降低其声量加成
+                
+                const isRunForHer = pName.includes("run for her") || pName.includes("她行") || pDesc.includes("run for her") || pDesc.includes("她行");
+                const isCIIE = pName.includes("进博会") || pName.includes("ciie") || pDesc.includes("进博会") || pDesc.includes("ciie");
                 const isCongrong = pName.includes("从容生活") || pDesc.includes("从容生活");
 
                 const isHighValue = highValueKeywords.some(k => pName.includes(k) || pDesc.includes(k));
@@ -283,21 +285,25 @@ const App: React.FC = () => {
                 const isFocused = focusedKeywords.some(k => pName.includes(k) || pDesc.includes(k));
 
                 // 只有高价值且非纯买量的项目才获得加成
-                const projectBoost = (isHighValue && !isLowValue) ? 2.5 : 0.2;
+                let projectBoost = (isHighValue && !isLowValue) ? 3.0 : 0.5; // 提高基础加成
+                if (isRunForHer) projectBoost += 1.0; // 额外给 Run for Her 加成
+                
                 // 针对 LC/GIGU 给予额外的信息聚焦加成
                 const focusBoost = (isFocused && !isCongrong) ? 0.8 : 0;
 
                 // 恢复权重：回归 0.6/0.4 比例，侧重传播质量
                 let volTotal = Math.min(10, 0.6 * volQuality + 0.4 * tierScore + projectBoost);
-                if (isCongrong) volTotal = Math.min(10, volTotal * 0.7); // 额外降低从容生活的声量分数
-                const trueDemand = Math.min(10, 0.6 * aiRes.km_score + 0.4 * aiRes.audience_precision_score + projectBoost + focusBoost);
+                if (isCongrong) volTotal = Math.min(10, volTotal * 0.5); // 显著降低从容生活的声量分数
+                
+                let trueDemand = Math.min(10, 0.6 * aiRes.km_score + 0.4 * aiRes.audience_precision_score + projectBoost + focusBoost);
+                if (isCIIE) trueDemand = Math.max(1.0, trueDemand - 2.5); // 显著降低进博会的真需求分数
                 
                 // 提高 Run for Her 等高价值项目的获客效能加成，降低进博会等高成本项目的获客效能
                 let acquisitionScore = aiRes.acquisition_score;
                 if (isHighValue && !isLowValue) {
-                  acquisitionScore = Math.min(10, acquisitionScore + 2.0);
-                } else if (isLowValue) {
-                  acquisitionScore = Math.max(1.0, acquisitionScore - 3.5); // 显著降低高成本项目的获客效能
+                  acquisitionScore = Math.min(10, acquisitionScore + 2.5);
+                } else if (isLowValue || isCIIE) {
+                  acquisitionScore = Math.max(1.0, acquisitionScore - 4.5); // 进一步降低高成本项目的获客效能
                 }
                 
                 const totalScore = Math.min(10, (0.5 * trueDemand) + (0.2 * acquisitionScore) + (0.3 * volTotal) + (isHighValue ? 1.0 : 0));
@@ -495,88 +501,100 @@ const App: React.FC = () => {
 
   const renderCharts = useCallback(() => {
     if (activeTab === "tab3" && batchResults && window.Plotly) {
-      const radarContainer = document.getElementById('radar-chart');
-      const scatterContainer = document.getElementById('scatter-chart');
-      
-      if (!radarContainer || !scatterContainer) return;
-
-      const avg = (key: keyof BatchResult) => 
-        batchResults.reduce((a, b) => a + parseFloat(b[key] as string || "0"), 0) / batchResults.length;
-      
-      const radarData = [
-        avg('核心信息匹配'), avg('获客效能'), avg('受众精准'), avg('媒体分级'), avg('传播质量')
-      ];
-
-      window.Plotly.newPlot('radar-chart', [{
-        type: 'scatterpolar', 
-        r: [...radarData, radarData[0]],
-        theta: ['核心信息匹配', '获客效能', '受众精准', '媒体分级', '传播质量', '核心信息匹配'],
-        fill: 'toself', 
-        line: { color: '#1E88E5', width: 2 }, 
-        fillcolor: 'rgba(30, 136, 229, 0.3)',
-        marker: { size: 6 }
-      }], { 
-        polar: { 
-          radialaxis: { visible: true, range: [0, 10], tickfont: { size: 10 } },
-          angularaxis: { tickfont: { size: 11 } }
-        }, 
-        showlegend: false, 
-        autosize: true, 
-        height: 380, 
-        margin: { t: 60, b: 60, l: 80, r: 80 } 
-      }, { displayModeBar: false, responsive: true });
-
-      // 散点图优化：增加随机抖动 (Jitter) 和 自定义 Hover 模板
-      const scatterX = batchResults.map(d => parseFloat(d.声量) + (Math.random() - 0.5) * 0.3);
-      const scatterY = batchResults.map(d => parseFloat(d.真需求) + (Math.random() - 0.5) * 0.3);
-      const hoverTexts = batchResults.map(d => `<b>${d.媒体名称}</b><br>标题：${d.标题.substring(0,15)}...<br>总分：${d.项目总分}<br>媒体分级：${d.媒体分级}`);
-
-      window.Plotly.newPlot('scatter-chart', [{
-        x: scatterX, 
-        y: scatterY,
-        mode: 'markers', 
-        hoverinfo: 'text',
-        text: hoverTexts,
-        marker: { 
-          size: batchResults.map(d => Math.min(45, Math.max(16, parseFloat(d.项目总分) * 4))), 
-          color: batchResults.map(d => parseFloat(d.项目总分)), 
-          colorscale: [
-            [0, '#E3F2FD'],
-            [0.5, '#64B5F6'],
-            [1, '#0D47A1']
-          ],
-          showscale: true,
-          opacity: 0.8,
-          line: { width: 1.5, color: '#ffffff' }
+      try {
+        const radarContainer = document.getElementById('radar-chart');
+        const scatterContainer = document.getElementById('scatter-chart');
+        
+        if (!radarContainer || !scatterContainer) {
+          console.warn("Chart containers not found");
+          return;
         }
-      }], { 
-        xaxis: { title: '声量 (0-10)', range: [-0.5, 10.5], gridcolor: '#f0f0f0', zeroline: false }, 
-        yaxis: { title: '真需求 (0-10)', range: [-0.5, 10.5], gridcolor: '#f0f0f0', zeroline: false }, 
-        shapes: [
-          // 象限划分线条
-          { type: 'line', x0: 5, y0: 0, x1: 5, y1: 10, line: { color: '#bbb', width: 1, dash: 'dot' } },
-          { type: 'line', x0: 0, y0: 5, x1: 10, y1: 5, line: { color: '#bbb', width: 1, dash: 'dot' } },
-          // 象限背景色
-          { type: 'rect', x0: 5, y0: 5, x1: 10, y1: 10, fillcolor: 'rgba(30, 136, 229, 0.05)', line: {width: 0}, layer: 'below' },
-          { type: 'rect', x0: 0, y0: 0, x1: 5, y1: 5, fillcolor: 'rgba(158, 158, 158, 0.05)', line: {width: 0}, layer: 'below' }
-        ],
-        annotations: [
-          { x: 7.5, y: 9.5, text: '核心媒体 (高量高质)', showarrow: false, font: { color: '#1E88E5', size: 10 } },
-          { x: 2.5, y: 9.5, text: '精准媒体 (小众深耕)', showarrow: false, font: { color: '#777', size: 10 } },
-          { x: 7.5, y: 0.5, text: '泛分发媒体 (大众曝光)', showarrow: false, font: { color: '#777', size: 10 } },
-          { x: 2.5, y: 0.5, text: '边缘分发', showarrow: false, font: { color: '#bbb', size: 10 } }
-        ],
-        plot_bgcolor: '#ffffff',
-        autosize: true, 
-        height: 380, 
-        margin: { t: 40, b: 60, l: 60, r: 40 } 
-      }, { displayModeBar: false, responsive: true });
+
+        const avg = (key: keyof BatchResult) => 
+          batchResults.reduce((a, b) => a + parseFloat(b[key] as string || "0"), 0) / batchResults.length;
+        
+        const radarData = [
+          avg('核心信息匹配'), avg('获客效能'), avg('受众精准'), avg('媒体分级'), avg('传播质量')
+        ];
+
+        window.Plotly.newPlot('radar-chart', [{
+          type: 'scatterpolar', 
+          r: [...radarData, radarData[0]],
+          theta: ['核心信息匹配', '获客效能', '受众精准', '媒体分级', '传播质量', '核心信息匹配'],
+          fill: 'toself', 
+          line: { color: '#1E88E5', width: 2 }, 
+          fillcolor: 'rgba(30, 136, 229, 0.3)',
+          marker: { size: 6 }
+        }], { 
+          polar: { 
+            radialaxis: { visible: true, range: [0, 10], tickfont: { size: 10 } },
+            angularaxis: { tickfont: { size: 11 } }
+          }, 
+          showlegend: false, 
+          autosize: true, 
+          height: 380, 
+          margin: { t: 60, b: 60, l: 80, r: 80 } 
+        }, { displayModeBar: false, responsive: true });
+
+        // 散点图优化：增加随机抖动 (Jitter) 和 自定义 Hover 模板
+        const scatterX = batchResults.map(d => parseFloat(d.声量) + (Math.random() - 0.5) * 0.3);
+        const scatterY = batchResults.map(d => parseFloat(d.真需求) + (Math.random() - 0.5) * 0.3);
+        const hoverTexts = batchResults.map(d => `<b>${d.媒体名称}</b><br>标题：${d.标题.substring(0,15)}...<br>总分：${d.项目总分}<br>媒体分级：${d.媒体分级}`);
+
+        window.Plotly.newPlot('scatter-chart', [{
+          x: scatterX, 
+          y: scatterY,
+          mode: 'markers', 
+          hoverinfo: 'text',
+          text: hoverTexts,
+          marker: { 
+            size: batchResults.map(d => Math.min(45, Math.max(16, parseFloat(d.项目总分) * 4))), 
+            color: batchResults.map(d => parseFloat(d.项目总分)), 
+            colorscale: [
+              [0, '#E3F2FD'],
+              [0.5, '#64B5F6'],
+              [1, '#0D47A1']
+            ],
+            showscale: true,
+            opacity: 0.8,
+            line: { width: 1.5, color: '#ffffff' }
+          }
+        }], { 
+          xaxis: { title: '声量 (0-10)', range: [-0.5, 10.5], gridcolor: '#f0f0f0', zeroline: false }, 
+          yaxis: { title: '真需求 (0-10)', range: [-0.5, 10.5], gridcolor: '#f0f0f0', zeroline: false }, 
+          shapes: [
+            // 象限划分线条
+            { type: 'line', x0: 5, y0: 0, x1: 5, y1: 10, line: { color: '#bbb', width: 1, dash: 'dot' } },
+            { type: 'line', x0: 0, y0: 5, x1: 10, y1: 5, line: { color: '#bbb', width: 1, dash: 'dot' } },
+            // 象限背景色
+            { type: 'rect', x0: 5, y0: 5, x1: 10, y1: 10, fillcolor: 'rgba(30, 136, 229, 0.05)', line: {width: 0}, layer: 'below' },
+            { type: 'rect', x0: 0, y0: 0, x1: 5, y1: 5, fillcolor: 'rgba(158, 158, 158, 0.05)', line: {width: 0}, layer: 'below' }
+          ],
+          annotations: [
+            { x: 7.5, y: 9.5, text: '核心媒体 (高量高质)', showarrow: false, font: { color: '#1E88E5', size: 10 } },
+            { x: 2.5, y: 9.5, text: '精准媒体 (小众深耕)', showarrow: false, font: { color: '#777', size: 10 } },
+            { x: 7.5, y: 0.5, text: '泛分发媒体 (大众曝光)', showarrow: false, font: { color: '#777', size: 10 } },
+            { x: 2.5, y: 0.5, text: '边缘分发', showarrow: false, font: { color: '#bbb', size: 10 } }
+          ],
+          plot_bgcolor: '#ffffff',
+          autosize: true, 
+          height: 380, 
+          margin: { t: 40, b: 60, l: 60, r: 40 } 
+        }, { displayModeBar: false, responsive: true });
+      } catch (err) {
+        console.error("Plotly error:", err);
+      }
     }
   }, [activeTab, batchResults]);
 
   useEffect(() => {
     // 只有在非处理状态或者进度完成时才渲染图表，减少处理过程中的计算压力
-    if (isProcessing && progress % 20 !== 0 && progress !== 100) return;
+    // 移除 progress % 20 的限制，只要进度有更新或者处理结束就尝试渲染
+    if (isProcessing && progress !== 100) {
+      // 在处理中也尝试渲染，但频率降低
+      const timer = setTimeout(renderCharts, 1000);
+      return () => clearTimeout(timer);
+    }
     
     const timer = setTimeout(renderCharts, 300);
     return () => clearTimeout(timer);
