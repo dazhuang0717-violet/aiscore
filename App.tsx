@@ -834,7 +834,6 @@ const App: React.FC = () => {
                     </span>
                     <div className="flex flex-col items-end">
                       <span className="text-sm font-bold text-blue-700">{progress}%</span>
-                      <span className="text-[10px] text-blue-400 mt-1">正在应用速率控制以确保稳定性</span>
                     </div>
                   </div>
                   <div className="w-full bg-gray-200 h-2.5 rounded-full overflow-hidden shadow-inner">
@@ -946,9 +945,11 @@ const App: React.FC = () => {
                     <div className="st-metric-label">获客效能潜力</div>
                       <div className="st-metric-value text-blue-600">{acquisitionProjectResult.score.toFixed(1)}/10</div>
                     </div>
-                    <div className="md:col-span-3 bg-blue-50/50 p-6 rounded-2xl border border-blue-100">
-                      <h4 className="font-bold text-blue-700 text-sm mb-2">💡 获客效能简评</h4>
-                      <p className="text-sm text-gray-700 leading-relaxed">{acquisitionProjectResult.comment}</p>
+                    <div className="md:col-span-3 bg-blue-50/50 p-6 rounded-2xl border border-blue-100 shadow-sm">
+                      <h4 className="font-bold text-blue-700 text-sm mb-3 flex items-center gap-2">
+                        <span className="bg-blue-600 text-white p-1 rounded-lg text-[10px]">💡</span> 获客效能简评
+                      </h4>
+                      <p className="text-sm text-gray-700 leading-relaxed bg-white/50 p-4 rounded-xl border border-blue-50">{acquisitionProjectResult.comment}</p>
                     </div>
                   </div>
                 </div>
@@ -999,8 +1000,9 @@ const App: React.FC = () => {
                           <div className={`st-metric-label ${m.l === '项目总分' ? 'text-blue-600 font-medium' : ''}`}>{m.l}</div>
                           <div className={`st-metric-value ${m.l === '项目总分' ? 'text-blue-700' : ''}`}>{avgVal.toFixed(1)}/10</div>
                           {comment && (
-                            <div className="mt-3 pt-3 border-t border-gray-100 text-[10px] text-gray-500 italic leading-tight">
-                              AI 简评： {comment}
+                            <div className="mt-4 p-4 bg-gray-50/80 rounded-xl border border-gray-100 text-xs text-gray-700 leading-relaxed shadow-inner">
+                              <span className="font-bold text-blue-600 block mb-1">💡 AI 简评：</span>
+                              {comment}
                             </div>
                           )}
                         </div>
