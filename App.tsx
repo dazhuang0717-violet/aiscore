@@ -345,13 +345,16 @@ const App: React.FC = () => {
                 const pDesc = (projectDesc || "").toLowerCase();
                 
                 // 定义“高价值/低成本”关键词
-                const highValueKeywords = ["run for her", "她行", "公益", "海报", "患者", "创意", "宣教", "科普"];
+                const highValueKeywords = ["run for her", "她行", "公益", "海报", "患者", "创意", "宣教", "科普", "年轮", "小红书", "短视频"];
                 // 定义“纯买量/高成本”关键词
-                const lowValueKeywords = ["医保", "落地", "购买", "硬广", "投放", "展会", "ciie", "进博会", "从容生活"];
+                const lowValueKeywords = ["医保", "落地", "购买", "硬广", "投放", "ciie", "进博会", "从容生活"];
                 // 定义“信息聚焦”关键词 (LC/GIGU)
                 const focusedKeywords = ["lc", "肺癌", "gigu", "肝癌", "无瘤生存"];
                 
                 const isRunForHer = pName.includes("run for her") || pName.includes("她行") || pDesc.includes("run for her") || pDesc.includes("她行");
+                const isSocialCampaign = isRunForHer || pName.includes("小红书") || pName.includes("短视频") || pDesc.includes("小红书") || pDesc.includes("短视频");
+                const isYearRing = pName.includes("年轮") || pDesc.includes("年轮");
+                const isInsurance = pName.includes("医保") || pName.includes("落地") || pDesc.includes("医保") || pDesc.includes("落地");
                 const isCIIE = pName.includes("进博会") || pName.includes("ciie") || pDesc.includes("进博会") || pDesc.includes("ciie");
                 const isCongrong = pName.includes("从容生活") || pDesc.includes("从容生活");
 
@@ -361,7 +364,7 @@ const App: React.FC = () => {
 
                 // 只有高价值且非纯买量的项目才获得加成
                 let projectBoost = (isHighValue && !isLowValue) ? 3.0 : 0.5; // 提高基础加成
-                if (isRunForHer) projectBoost += 1.0; // 额外给 Run for Her 加成
+                if (isSocialCampaign) projectBoost += 1.0; // 额外给社交/短视频项目加成
                 
                 // 针对 LC/GIGU 给予额外的信息聚焦加成
                 const focusBoost = (isFocused && !isCongrong) ? 0.8 : 0;
@@ -371,15 +374,17 @@ const App: React.FC = () => {
                 if (isCongrong) volTotal = Math.min(10, volTotal * 0.5); // 显著降低从容生活的声量分数
                 
                 let trueDemand = Math.min(10, 0.6 * aiRes.km_score + 0.4 * aiRes.audience_precision_score + projectBoost + focusBoost);
+                if (isInsurance) trueDemand = Math.min(10, trueDemand + 2.0); // 医保落地真需求极高
                 if (isCIIE) trueDemand = Math.max(1.0, trueDemand - 2.5); // 显著降低进博会的真需求分数
                 
                 // 提高 Run for Her 等高价值项目的获客效能加成，降低进博会等高成本项目的获客效能
                 let acquisitionScore = aiRes.acquisition_score;
                 if (isHighValue && !isLowValue) {
-                  acquisitionScore = Math.min(10, acquisitionScore + 2.5);
+                  acquisitionScore = Math.min(10, acquisitionScore + 3.0); // 提高加成
                 } else if (isLowValue || isCIIE) {
                   acquisitionScore = Math.max(1.0, acquisitionScore - 4.5); // 进一步降低高成本项目的获客效能
                 }
+                if (isYearRing) acquisitionScore = Math.min(10, acquisitionScore + 1.5); // 年轮项目额外加成
                 
                 const totalScore = Math.min(10, (0.5 * trueDemand) + (0.2 * acquisitionScore) + (0.3 * volTotal) + (isHighValue ? 1.0 : 0));
 
