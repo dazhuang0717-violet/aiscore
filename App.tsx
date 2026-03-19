@@ -16,6 +16,81 @@ type SortConfig = {
   direction: 'asc' | 'desc';
 } | null;
 
+const PatientDemandFramework = () => {
+  const products = [
+    { name: "Phesgo (无线人生)", slogan: "更少时间做病人，更多时间做自己", levels: ["自我实现", "尊重需求", "爱与归属"], color: "bg-yellow-50 border-yellow-200 text-yellow-800" },
+    { name: "Itovebi (无限人生)", slogan: "抗击复发耐药的焦虑感", levels: ["安全需求", "生理需求"], color: "bg-green-50 border-green-200 text-green-800" },
+    { name: "Alecensa (从从容容)", slogan: "活得久，活得好；从从容容", levels: ["自我实现", "尊重需求", "安全需求", "生理需求"], color: "bg-red-50 border-red-200 text-red-800" },
+    { name: "Polivy (一线即治愈)", slogan: "一线即治愈，治疗少走弯路", levels: ["自我实现", "生理需求"], color: "bg-blue-50 border-blue-200 text-blue-800" },
+    { name: "Glofitamab (超越治愈)", slogan: "即诊即用，重获新生", levels: ["安全需求", "生理需求"], color: "bg-emerald-50 border-emerald-200 text-emerald-800" },
+    { name: "Gazyva (超长无进展)", slogan: "超长无进展生存期，缓解复发焦虑", levels: ["安全需求", "生理需求"], color: "bg-red-50 border-red-200 text-red-800" },
+    { name: "T+A (无癌生存)", slogan: "重建生存安全感", levels: ["安全需求", "生理需求"], color: "bg-purple-50 border-purple-200 text-purple-800" },
+  ];
+
+  const maslow = [
+    { level: "治愈与新生", need: "自我实现", desc: "实现治愈\n重启人生规划与希望", color: "bg-[#FF6D00]" },
+    { level: "去病患标签", need: "尊重需求", desc: "隐形治疗\n重塑社会身份与尊严", color: "bg-[#2E7D32]" },
+    { level: "时间与陪伴", need: "爱与归属", desc: "时空释放\n把时间还给家庭和生活", color: "bg-[#0277BD]" },
+    { level: "耐受与保障", need: "安全需求", desc: "毒副管理与可支付性\n消除身心失控感", color: "bg-[#8E24AA]" },
+    { level: "生存与底线", need: "生理需求", desc: "遏制进展与复发\n打破耐药绝境", color: "bg-[#43A047]" },
+  ];
+
+  return (
+    <div className="mt-12 border-t pt-10">
+      <h4 className="text-center font-bold text-lg mb-8 flex items-center justify-center gap-2">
+        <span className="text-2xl">🎯</span> 患者真需求分析框架 (基于马斯洛需求层次)
+      </h4>
+      <div className="flex flex-col xl:flex-row gap-10 items-stretch">
+        {/* Maslow Pyramid */}
+        <div className="w-full xl:w-7/12 flex flex-col items-center space-y-2">
+          <p className="text-[10px] font-bold text-gray-400 mb-4 uppercase tracking-widest text-center w-full">马斯洛需求在患者身上的映射</p>
+          {maslow.map((m, i) => (
+            <div 
+              key={i} 
+              className={`${m.color} text-white p-4 rounded-xl shadow-sm flex items-center gap-6 transform transition-all hover:scale-[1.02] hover:shadow-md`} 
+              style={{ 
+                width: `${50 + i * 12.5}%`,
+                minHeight: '70px'
+              }}
+            >
+              <div className="flex-shrink-0 w-24 text-center border-r border-white/30 pr-4">
+                <div className="text-[9px] font-bold opacity-80 uppercase tracking-tighter">{m.need}</div>
+                <div className="text-xs font-bold whitespace-nowrap">{m.level}</div>
+              </div>
+              <div className="flex flex-col justify-center">
+                {m.desc.split('\n').map((line, idx) => (
+                  <div key={idx} className={`text-xs leading-snug ${idx === 0 ? 'font-bold mb-0.5' : 'font-medium opacity-90'}`}>
+                    {line}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        {/* Product Mapping */}
+        <div className="w-full xl:w-5/12 flex flex-col">
+          <p className="text-[10px] font-bold text-gray-400 mb-4 uppercase tracking-widest text-center">患者真需求 vs 产品核心卖点</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1">
+            {products.map((p, i) => (
+              <div key={i} className={`${p.color} p-4 rounded-3xl border shadow-sm flex flex-col justify-between transition-all hover:shadow-md`}>
+                <div>
+                  <div className="text-xs font-bold mb-1.5">{p.name}</div>
+                  <div className="text-[10px] leading-tight mb-3 opacity-90 italic">“{p.slogan}”</div>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {p.levels.map((l, j) => (
+                    <span key={j} className="text-[8px] px-2 py-0.5 bg-white/50 rounded-full font-bold text-gray-700">{l}</span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const App: React.FC = () => {
   // --- Configuration State ---
   const [projectName, setProjectName] = useState("");
@@ -613,9 +688,9 @@ const App: React.FC = () => {
           <label className="text-xs font-semibold text-gray-600 block mb-1">项目名称</label>
           <input value={projectName} onChange={e => setProjectName(e.target.value)} className="st-input" />
           
-          <label className="text-xs font-semibold text-gray-600 block mb-1">项目描述（用于评估获客效能）</label>
+          <label className="text-xs font-semibold text-gray-600 block mb-1">项目描述</label>
           <textarea value={projectDesc} onChange={e => setProjectDesc(e.target.value)} className="st-input h-80 no-scrollbar" />
-          <label className="text-xs font-semibold text-gray-600 block mb-2">目标受众模式（可多选）</label>
+          <label className="text-xs font-semibold text-gray-600 block mb-2">目标受众（可多选）</label>
           <div className="space-y-1 mb-6">
             {[AudienceMode.GENERAL, AudienceMode.PATIENT, AudienceMode.HCP].map(m => (
               <label key={m} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
@@ -667,6 +742,7 @@ const App: React.FC = () => {
                   <div>* 获客效能：计算获取每个新客户需投入的成本，得出项目能否高效吸引并转化潜在客户</div>
                   <div>* 传播质量 = Log10(阅读量 × 阅读权重 + 互动量 × 互动权重 + 10) × 系数</div>
                 </div>
+                <PatientDemandFramework />
               </div>
             </div>
           )}
