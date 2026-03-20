@@ -9,7 +9,8 @@ export const analyzeWithGemini = async (
   projectDesc: string,
   mediaName: string = "",
   isNewsRelease: boolean = false,
-  supplementaryMaterials: string = ""
+  supplementaryMaterials: string = "",
+  selectedProducts: string[] = []
 ): Promise<AIAnalysisResult> => {
   const apiKey = process.env.GEMINI_API_KEY;
 
@@ -19,18 +20,41 @@ export const analyzeWithGemini = async (
 
   const ai = new GoogleGenAI({ apiKey });
   
+  const productNeeds: Record<string, string[]> = {
+    "Phesgo": ["治愈与新生", "去病患标签", "时间与陪伴"],
+    "Itovebi": ["耐受与保障", "生存与底线"],
+    "Alecensa": ["治愈与新生", "去病患标签", "耐受与保障", "生存与底线"],
+    "Polivy": ["治愈与新生", "生存与底线"],
+    "Glofitamab": ["耐受与保障", "生存与底线"],
+    "Gazyva": ["耐受与保障", "生存与底线"],
+    "T+A": ["耐受与保障", "生存与底线"]
+  };
+
+  let productContext = "";
+  if (selectedProducts.length > 0) {
+    productContext = `本次分析的核心产品为：${selectedProducts.join(", ")}。\n`;
+    productContext += `对于这些产品，请**仅关注**以下对应的患者真需求维度，忽略其他维度：\n`;
+    selectedProducts.forEach(p => {
+      if (productNeeds[p]) {
+        productContext += `- ${p}: ${productNeeds[p].join(", ")}\n`;
+      }
+    });
+  }
+
   let prompt = `你是一个专业的罗氏肿瘤领域公关传播分析师。请基于以下项目背景进行评分。
 你的目标是评估项目的“信息匹配”（Information Matching）。
+
+${productContext}
 
 评分维度定义：
 1. 真需求 (50%)：评估内容是否“说对了话”且“找对了人”。
    - 信息匹配 (60%)：项目传递信息能否使目标受众共鸣并感到明确获益。
-     * 医生需求：学术突破（如伊那利塞新药）、提高患者满意度、提升口碑。
-     * 院管需求：省钱、省床位（如皮下疗法减少治疗时间）。
-     * 乳腺癌患者：生活质量（如皮下疗法）。
-     * 肺癌患者：少副作用、长生存（如阿来替尼）。
-     * 血液患者：少花钱、活下去。
-     * 普适需求：医保为患者省钱。
+     * 重点参考“患者真需求”框架（请根据上述核心产品要求进行客制化理解）：
+       - 治愈与新生 (自我实现): 实现治愈，重启人生规划与希望。
+       - 去病患标签 (尊重需求): 隐形治疗，重塑社会身份与尊严。
+       - 时间与陪伴 (爱与归属): 时空释放，把时间还给家庭和生活。
+       - 耐受与保障 (安全需求): 毒副管理与可支付性，消除身心失控感。
+       - 生存与底线 (生理需求): 遏制进展与复发，打破耐药绝境。
      * 评分参考：Run for Her、医保落地等项目应得极高分（9.5-10分）；信息点过于分散或泛化的项目（如某些乳腺癌进博会报道）应得低分。得分需拉开差距。对于 Run for Her，其真需求分数必须在 9.8 以上。
    - 受众精准 (40%)：
      * 场景触达：日间诊室张贴海报（100%触达） > 药房。
@@ -150,7 +174,8 @@ export const analyzeBatchWithGemini = async (
   items: BatchAnalysisInput[],
   audienceModes: string[],
   projectDesc: string,
-  supplementaryMaterials: string = ""
+  supplementaryMaterials: string = "",
+  selectedProducts: string[] = []
 ): Promise<AIAnalysisResult[]> => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || apiKey === "undefined" || apiKey === "") {
@@ -159,6 +184,27 @@ export const analyzeBatchWithGemini = async (
 
   const ai = new GoogleGenAI({ apiKey });
   
+  const productNeeds: Record<string, string[]> = {
+    "Phesgo": ["治愈与新生", "去病患标签", "时间与陪伴"],
+    "Itovebi": ["耐受与保障", "生存与底线"],
+    "Alecensa": ["治愈与新生", "去病患标签", "耐受与保障", "生存与底线"],
+    "Polivy": ["治愈与新生", "生存与底线"],
+    "Glofitamab": ["耐受与保障", "生存与底线"],
+    "Gazyva": ["耐受与保障", "生存与底线"],
+    "T+A": ["耐受与保障", "生存与底线"]
+  };
+
+  let productContext = "";
+  if (selectedProducts.length > 0) {
+    productContext = `本次分析的核心产品为：${selectedProducts.join(", ")}。\n`;
+    productContext += `对于这些产品，请**仅关注**以下对应的患者真需求维度，忽略其他维度：\n`;
+    selectedProducts.forEach(p => {
+      if (productNeeds[p]) {
+        productContext += `- ${p}: ${productNeeds[p].join(", ")}\n`;
+      }
+    });
+  }
+
   const itemsPrompt = items.map((item, index) => `
 --- 待分析项 #${index + 1} ---
 媒体名称: ${item.mediaName}
@@ -169,6 +215,8 @@ export const analyzeBatchWithGemini = async (
 请对以下 ${items.length} 个传播项进行批量评分。
 你的目标是评估项目的“信息匹配”（Information Matching）。
 
+${productContext}
+
 项目背景：
 - 受众模式: ${audienceModes.join(", ")}
 - 项目描述: ${projectDesc}
@@ -177,14 +225,12 @@ export const analyzeBatchWithGemini = async (
 评分维度定义：
 1. 真需求 (50%)：评估内容是否“说对了话”且“找对了人”。
    - 信息匹配 (60%)：评估内容是否触达患者的核心痛点及马斯洛需求层次。
-     * 重点参考“患者真需求”框架：
-       - Phesgo: 侧重“时间与陪伴”、“治愈与新生”、“去病患标签”。核心：把时间还给生活，重塑尊严。
-       - Itovebi: 侧重“耐受与保障”、“生存与底线”。核心：抗击复发耐药焦虑，消除失控感。
-       - Alecensa: 侧重“治愈与新生”、“尊重需求”、“耐受与保障”、“生存与底线”。核心：活得久，活得好，从从容容。
-       - Polivy: 侧重“治愈与新生”、“生存与底线”。核心：一线即治愈，少走弯路。
-       - Glofitamab: 侧重“生存与底线”、“耐受与保障”。核心：即诊即用，重获新生。
-       - Gazyva: 侧重“耐受与保障”、“生存与底线”。核心：超长无进展，缓解复发焦虑。
-       - T+A: 侧重“耐受与保障”、“生存与底线”。核心：重建生存安全感，守住底线。
+     * 重点参考“患者真需求”框架（请根据上述核心产品要求进行客制化理解）：
+       - 治愈与新生 (自我实现): 实现治愈，重启人生规划与希望。
+       - 去病患标签 (尊重需求): 隐形治疗，重塑社会身份与尊严。
+       - 时间与陪伴 (爱与归属): 时空释放，把时间还给家庭和生活。
+       - 耐受与保障 (安全需求): 毒副管理与可支付性，消除身心失控感。
+       - 生存与底线 (生理需求): 遏制进展与复发，打破耐药绝境。
      * 评分标准：
        - 10分：精准匹配上述产品核心主张，且深度触达对应的患者心声（如“想回家陪家人”、“不想被当作废人”等）。对于 Run for Her，其真需求分数必须在 9.8 以上。
        - 7-8分：触达了患者需求，但主张不够鲜明或仅停留在生存层面。

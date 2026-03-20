@@ -18,32 +18,32 @@ type SortConfig = {
 
 const PatientDemandFramework = () => {
   const products = [
-    { name: "Phesgo (无线人生)", slogan: "更少时间做病人，更多时间做自己", levels: ["自我实现", "尊重需求", "爱与归属"], color: "bg-yellow-50 border-yellow-200 text-yellow-800" },
-    { name: "Itovebi (无限人生)", slogan: "抗击复发耐药的焦虑感", levels: ["安全需求", "生理需求"], color: "bg-green-50 border-green-200 text-green-800" },
-    { name: "Alecensa (从从容容)", slogan: "活得久，活得好；从从容容", levels: ["自我实现", "尊重需求", "安全需求", "生理需求"], color: "bg-red-50 border-red-200 text-red-800" },
-    { name: "Polivy (一线即治愈)", slogan: "一线即治愈，治疗少走弯路", levels: ["自我实现", "生理需求"], color: "bg-blue-50 border-blue-200 text-blue-800" },
-    { name: "Glofitamab (超越治愈)", slogan: "即诊即用，重获新生", levels: ["安全需求", "生理需求"], color: "bg-emerald-50 border-emerald-200 text-emerald-800" },
-    { name: "Gazyva (超长无进展)", slogan: "超长无进展生存期，缓解复发焦虑", levels: ["安全需求", "生理需求"], color: "bg-red-50 border-red-200 text-red-800" },
-    { name: "T+A (无癌生存)", slogan: "重建生存安全感", levels: ["安全需求", "生理需求"], color: "bg-purple-50 border-purple-200 text-purple-800" },
+    { name: "Phesgo (无线人生)", slogan: "更少时间做病人，更多时间做自己", levels: ["治愈与新生", "去病患标签", "时间与陪伴"], color: "bg-orange-50 border-orange-200 text-orange-800" },
+    { name: "Itovebi (无限人生)", slogan: "抗击复发耐药的焦虑感", levels: ["耐受与保障", "生存与底线"], color: "bg-green-50 border-green-200 text-green-800" },
+    { name: "Alecensa (从从容容)", slogan: "活得久，活得好；从从容容", levels: ["治愈与新生", "去病患标签", "耐受与保障", "生存与底线"], color: "bg-red-50 border-red-200 text-red-800" },
+    { name: "Polivy (一线即治愈)", slogan: "一线即治愈，治疗少走弯路", levels: ["治愈与新生", "生存与底线"], color: "bg-blue-50 border-blue-200 text-blue-800" },
+    { name: "Glofitamab (超越治愈)", slogan: "即诊即用，重获新生", levels: ["耐受与保障", "生存与底线"], color: "bg-emerald-50 border-emerald-200 text-emerald-800" },
+    { name: "Gazyva (超长无进展)", slogan: "超长无进展生存期，缓解复发焦虑", levels: ["耐受与保障", "生存与底线"], color: "bg-red-50 border-red-200 text-red-800" },
+    { name: "T+A (无癌生存)", slogan: "重建生存安全感", levels: ["耐受与保障", "生存与底线"], color: "bg-purple-50 border-purple-200 text-purple-800" },
   ];
 
   const maslow = [
-    { level: "治愈与新生", need: "自我实现", desc: "实现治愈\n重启人生规划与希望", color: "bg-[#FF6D00]" },
-    { level: "去病患标签", need: "尊重需求", desc: "隐形治疗\n重塑社会身份与尊严", color: "bg-[#2E7D32]" },
-    { level: "时间与陪伴", need: "爱与归属", desc: "时空释放\n把时间还给家庭和生活", color: "bg-[#0277BD]" },
-    { level: "耐受与保障", need: "安全需求", desc: "毒副管理与可支付性\n消除身心失控感", color: "bg-[#8E24AA]" },
-    { level: "生存与底线", need: "生理需求", desc: "遏制进展与复发\n打破耐药绝境", color: "bg-[#43A047]" },
+    { level: "治愈与新生", desc: "实现治愈\n重启人生规划与希望", color: "bg-[#FF6D00]" },
+    { level: "去病患标签", desc: "隐形治疗\n重塑社会身份与尊严", color: "bg-[#2E7D32]" },
+    { level: "时间与陪伴", desc: "时空释放\n把时间还给家庭和生活", color: "bg-[#0277BD]" },
+    { level: "耐受与保障", desc: "毒副管理与可支付性\n消除身心失控感", color: "bg-[#8E24AA]" },
+    { level: "生存与底线", desc: "遏制进展与复发\n打破耐药绝境", color: "bg-[#43A047]" },
   ];
 
   return (
     <div className="mt-12 border-t pt-10">
       <h4 className="text-center font-bold text-lg mb-8 flex items-center justify-center gap-2">
-        <span className="text-2xl">🎯</span> 患者真需求分析框架 (基于马斯洛需求层次)
+        <span className="text-2xl">🎯</span> 患者真需求分析框架
       </h4>
       <div className="flex flex-col xl:flex-row gap-10 items-stretch">
         {/* Maslow Pyramid */}
         <div className="w-full xl:w-7/12 flex flex-col items-center space-y-2">
-          <p className="text-[10px] font-bold text-gray-400 mb-4 uppercase tracking-widest text-center w-full">马斯洛需求在患者身上的映射</p>
+          <p className="text-[10px] font-bold text-gray-400 mb-4 uppercase tracking-widest text-center w-full">患者真需求映射</p>
           {maslow.map((m, i) => (
             <div 
               key={i} 
@@ -53,9 +53,8 @@ const PatientDemandFramework = () => {
                 minHeight: '70px'
               }}
             >
-              <div className="flex-shrink-0 w-24 text-center border-r border-white/30 pr-4">
-                <div className="text-[9px] font-bold opacity-80 uppercase tracking-tighter">{m.need}</div>
-                <div className="text-xs font-bold whitespace-nowrap">{m.level}</div>
+              <div className="flex-shrink-0 w-32 text-center border-r border-white/30 pr-4">
+                <div className="text-sm font-bold whitespace-nowrap">{m.level}</div>
               </div>
               <div className="flex flex-col justify-center">
                 {m.desc.split('\n').map((line, idx) => (
@@ -94,6 +93,7 @@ const PatientDemandFramework = () => {
 const App: React.FC = () => {
   // --- Configuration State ---
   const [projectName, setProjectName] = useState("");
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [projectDesc, setProjectDesc] = useState("");
   const [supplementaryMaterials, setSupplementaryMaterials] = useState("");
   const [supplementaryReview, setSupplementaryReview] = useState<{comment: string, km_score: number} | null>(null);
@@ -236,7 +236,8 @@ const App: React.FC = () => {
         projectDesc,
         "补充材料",
         false,
-        ""
+        "",
+        selectedProducts
       );
       setSupplementaryReview({
         comment: aiRes.one_sentence_summary || "已提取补充材料信息",
@@ -260,7 +261,7 @@ const App: React.FC = () => {
       const result = await window.mammoth.extractRawText({ arrayBuffer });
       const fullText = result.value;
       if (fullText.trim().length < 10) throw new Error("文档内容过少。");
-      const aiRes = await analyzeWithGemini(fullText, audienceModes, projectDesc, "", true, supplementaryMaterials);
+      const aiRes = await analyzeWithGemini(fullText, audienceModes, projectDesc, "", true, supplementaryMaterials, selectedProducts);
       setWordResult({ ...aiRes, textLen: fullText.length });
     } catch (err: any) {
       let msg = err.message || "分析 Word 文档时出错";
@@ -327,7 +328,7 @@ const App: React.FC = () => {
             }));
 
             try {
-              const aiResults = await analyzeBatchWithGemini(batchInputs, audienceModes, projectDesc, supplementaryMaterials);
+              const aiResults = await analyzeBatchWithGemini(batchInputs, audienceModes, projectDesc, supplementaryMaterials, selectedProducts);
               
               return batch.map((row, idx) => {
                 const aiRes = aiResults[idx] || { 
@@ -507,7 +508,8 @@ const App: React.FC = () => {
         projectDesc,
         "项目整体",
         false,
-        supplementaryMaterials
+        supplementaryMaterials,
+        selectedProducts
       );
       setAcquisitionProjectResult({
         score: response.acquisition_score,
@@ -693,6 +695,37 @@ const App: React.FC = () => {
           <label className="text-xs font-semibold text-gray-600 block mb-1">项目名称</label>
           <input value={projectName} onChange={e => setProjectName(e.target.value)} className="st-input" />
           
+          <label className="text-xs font-semibold text-gray-600 block mb-1">核心产品</label>
+          <div className="flex flex-wrap gap-2 mb-4">
+            {[
+              { name: "Phesgo", color: "bg-orange-100 text-orange-800 border-orange-300" },
+              { name: "Itovebi", color: "bg-green-100 text-green-800 border-green-300" },
+              { name: "Alecensa", color: "bg-red-100 text-red-800 border-red-300" },
+              { name: "Polivy", color: "bg-blue-100 text-blue-800 border-blue-300" },
+              { name: "Glofitamab", color: "bg-emerald-100 text-emerald-800 border-emerald-300" },
+              { name: "Gazyva", color: "bg-red-100 text-red-800 border-red-300" },
+              { name: "T+A", color: "bg-purple-100 text-purple-800 border-purple-300" }
+            ].map(p => (
+              <button
+                key={p.name}
+                onClick={() => {
+                  if (selectedProducts.includes(p.name)) {
+                    setSelectedProducts(selectedProducts.filter(x => x !== p.name));
+                  } else {
+                    setSelectedProducts([...selectedProducts, p.name]);
+                  }
+                }}
+                className={`text-[10px] px-2 py-1 rounded-full border transition-all ${
+                  selectedProducts.includes(p.name) 
+                    ? `${p.color} font-bold shadow-sm ring-1 ring-offset-1 ring-current/20` 
+                    : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50 hover:border-gray-400"
+                }`}
+              >
+                {p.name}
+              </button>
+            ))}
+          </div>
+
           <label className="text-xs font-semibold text-gray-600 block mb-1">项目描述</label>
           <textarea value={projectDesc} onChange={e => setProjectDesc(e.target.value)} className="st-input h-80 no-scrollbar" />
           <label className="text-xs font-semibold text-gray-600 block mb-2">目标受众（可多选）</label>
