@@ -3,6 +3,14 @@ import { AIAnalysisResult } from "../types";
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+// 简单的内存缓存，用于节约 API 调用
+const analysisCache = new Map<string, AIAnalysisResult>();
+
+// 生成内容的哈希值作为缓存键
+const getContentHash = (content: string, context: string): string => {
+  return `${content.substring(0, 1000)}_${content.length}_${context}`;
+};
+
 export const analyzeWithGemini = async (
   content: string, 
   audienceModes: string[], 
@@ -12,6 +20,12 @@ export const analyzeWithGemini = async (
   supplementaryMaterials: string = "",
   selectedProducts: string[] = []
 ): Promise<AIAnalysisResult> => {
+  const cacheKey = getContentHash(content, JSON.stringify({ audienceModes, projectDesc, selectedProducts, isNewsRelease }));
+  if (analysisCache.has(cacheKey)) {
+    console.log("使用缓存的分析结果");
+    return analysisCache.get(cacheKey)!;
+  }
+
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey || apiKey === "undefined" || apiKey === "") {
@@ -140,7 +154,11 @@ ${content.substring(0, 5000)}`;
 
       const text = response.text;
       if (!text) throw new Error("AI 返回了空响应");
-      return JSON.parse(text) as AIAnalysisResult;
+      const result = JSON.parse(text) as AIAnalysisResult;
+      
+      // 存入缓存
+      analysisCache.set(cacheKey, result);
+      return result;
     } catch (e: any) {
       const errorMsg = e.message || "";
       const isRateLimit = errorMsg.includes("429") || errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("Quota exceeded");
@@ -177,6 +195,27 @@ export const analyzeBatchWithGemini = async (
   supplementaryMaterials: string = "",
   selectedProducts: string[] = []
 ): Promise<AIAnalysisResult[]> => {
+  // 检查缓存
+  const context = JSON.stringify({ audienceModes, projectDesc, selectedProducts });
+  const results: AIAnalysisResult[] = new Array(items.length);
+  const uncachedIndices: number[] = [];
+  const uncachedItems: BatchAnalysisInput[] = [];
+
+  items.forEach((item, index) => {
+    const cacheKey = getContentHash(item.content, context);
+    if (analysisCache.has(cacheKey)) {
+      results[index] = analysisCache.get(cacheKey)!;
+    } else {
+      uncachedIndices.push(index);
+      uncachedItems.push(item);
+    }
+  });
+
+  if (uncachedItems.length === 0) {
+    console.log("批量分析：所有项均命中缓存");
+    return results;
+  }
+
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || apiKey === "undefined" || apiKey === "") {
     throw new Error("Gemini API Key 尚未配置。");
@@ -205,14 +244,14 @@ export const analyzeBatchWithGemini = async (
     });
   }
 
-  const itemsPrompt = items.map((item, index) => `
+  const itemsPrompt = uncachedItems.map((item, index) => `
 --- 待分析项 #${index + 1} ---
 媒体名称: ${item.mediaName}
 内容: ${item.content.substring(0, 2000)}
 `).join("\n");
 
   const prompt = `你是一个专业的罗氏肿瘤领域公关传播分析师。
-请对以下 ${items.length} 个传播项进行批量评分。
+请对以下 ${uncachedItems.length} 个传播项进行批量评分。
 你的目标是评估项目的“信息匹配”（Information Matching）。
 
 ${productContext}
@@ -234,7 +273,7 @@ ${productContext}
      * 评分标准：
        - 10分：精准匹配上述产品核心主张，且深度触达对应的患者心声（如“想回家陪家人”、“不想被当作废人”等）。对于 Run for Her，其真需求分数必须在 9.8 以上。
        - 7-8分：触达了患者需求，但主张不够鲜明或仅停留在生存层面。
-       - 4-6分：仅提及疗效，未触达情感或更高层次需求。
+       - 4-6分：仅提及疗效，未触达情感 or 更高层次需求。
        - 1-3分：信息错位，或完全未体现患者获益。
    - 受众精准 (40%)：
      * 场景触达：日间诊室张贴海报（100%触达） > 药房。
@@ -252,7 +291,7 @@ ${productContext}
 【评价要求】
 - 整体评价：从项目整体去评价，不要聚焦到某一个媒体，不要提到具体报纸或媒体的名字。
 - 社交媒体认定：H5 互动形式（如年轮项目）本身属于社交媒体传播范畴，应被归类为'社交媒体'，并认可其在社交平台上的互动价值。
-- Run for Her 专项：该项目具有极强的社交属性，核心形式为小红书短视频发布及短视频颁奖典礼。在评估声量时，必须认可其社交互动价值和短视频传播的爆发力，声量简评应体现其社交属性。
+- Run for Her 专项：该项目具有极强的社交属性，核心形式为小红书短视频发布及短视频颁乐典礼。在评估声量时，必须认可其社交互动价值和短视频传播的爆发力，声量简评应体现其社交属性。
 - 合规建议：严禁提出“导流”或任何违反医药合规的建议。请代之以“加强患者教育”、“提升学术深度”、“优化渠道选择”等专业建议。
 - 真实可信：不要使用“分数定位到中等区间”等表述。评价应专业、犀利、有洞察力。
 - 核心信息归纳：请通过阅读新闻稿，归纳出一句核心信息（15-30字）。
@@ -261,7 +300,7 @@ ${productContext}
 ${itemsPrompt}
 
 评分规则与输出要求：
-请为每个待分析项返回一个 JSON 对象，结果必须是一个包含 ${items.length} 个对象的数组。
+请为每个待分析项返回一个 JSON 对象，结果必须是一个包含 ${uncachedItems.length} 个对象的数组。
 每个对象必须包含以下字段：
 1. km_score: 信息匹配得分
 2. acquisition_score: 获客效能得分
@@ -318,15 +357,27 @@ ${itemsPrompt}
 
       const text = response.text;
       if (!text) throw new Error("AI 返回了空响应");
-      const results = JSON.parse(text);
+      const uncachedResults = JSON.parse(text);
       
-      return results.map((r: any) => ({
-        ...r,
-        acquisition_comment: r.acquisition_comment || r.one_sentence_summary || "待评估",
-        true_demand_comment: r.true_demand_comment || r.one_sentence_summary || "待评估",
-        volume_comment: r.volume_comment || r.one_sentence_summary || "待评估",
-        total_score_comment: r.total_score_comment || r.one_sentence_summary || "待评估",
-      }));
+      // 将新分析的结果存入缓存并填充到最终结果数组中
+      uncachedResults.forEach((r: any, i: number) => {
+        const result: AIAnalysisResult = {
+          ...r,
+          acquisition_comment: r.acquisition_comment || r.one_sentence_summary || "待评估",
+          true_demand_comment: r.true_demand_comment || r.one_sentence_summary || "待评估",
+          volume_comment: r.volume_comment || r.one_sentence_summary || "待评估",
+          total_score_comment: r.total_score_comment || r.one_sentence_summary || "待评估",
+        };
+        
+        const originalIndex = uncachedIndices[i];
+        results[originalIndex] = result;
+        
+        // 存入缓存
+        const cacheKey = getContentHash(uncachedItems[i].content, context);
+        analysisCache.set(cacheKey, result);
+      });
+      
+      return results;
     } catch (e: any) {
       const errorMsg = e.message || "";
       const isRateLimit = errorMsg.includes("429") || errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("Quota exceeded");

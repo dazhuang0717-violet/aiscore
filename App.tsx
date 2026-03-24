@@ -294,8 +294,8 @@ const App: React.FC = () => {
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const json = window.XLSX.utils.sheet_to_json(sheet) as any[];
         
-        const batchSize = 5; // 每 5 条数据打包成一个 API 请求
-        const concurrency = 2; // 同时进行 2 个 API 请求 (即同时处理 10 条数据)
+        const batchSize = 10; // 提高批处理大小，由 5 提高到 10，节约 API 调用次数
+        const concurrency = 2; // 同时进行 2 个 API 请求 (即同时处理 20 条数据)
         const results: BatchResult[] = [];
         const totalRows = json.length;
 
@@ -319,6 +319,11 @@ const App: React.FC = () => {
               const url = row['URL'] || row['链接'] || row['Link'] || "";
               let content = row['正文'] || row['Content'] || row['标题'] || title || "";
               const mediaName = row['媒体名称'] || row['媒体'] || "未知";
+
+              // 如果内容太短且没有 URL，直接跳过 AI 分析以节约额度
+              if (content.trim().length < 5 && !url) {
+                return { content: "内容过短，无法分析", mediaName };
+              }
 
               if (!content && url && url.startsWith("http")) {
                 const scraped = await fetchUrlContent(url);
@@ -769,19 +774,41 @@ const App: React.FC = () => {
           </div>
           {isExpanderOpen && (
             <div className="st-expander-content">
-              <div className="text-center text-sm md:text-lg leading-loose flex flex-col gap-2">
-                <div><span className="font-bold text-[#1E88E5]">总分</span> = 0.5 × 真需求 + 0.2 × 获客效能 + 0.3 × 声量</div>
-                <div className="flex flex-col md:flex-row justify-center md:gap-8">
-                  <div><span className="font-bold text-[#1E88E5]">真需求</span> = 0.6 × 信息匹配 + 0.4 × 受众精准</div>
-                  <div><span className="font-bold text-[#1E88E5]">声量</span> = 0.6 × 传播质量 + 0.4 × 媒体分级</div>
+              <div className="text-center flex flex-col gap-6 py-4">
+                {/* 第一行：总分核心公式 */}
+                <div className="text-lg md:text-2xl font-bold text-gray-800">
+                  <span className="text-[#1E88E5]">总分</span> = 0.5 × 真需求 + 0.3 × 声量 + 0.2 × 获客效能
                 </div>
-                <div className="mt-4 text-xs md:text-sm text-gray-500 italic flex flex-col gap-1">
+
+                {/* 第二行：三个核心维度及其子公式 */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-t border-gray-100 pt-6">
+                  <div className="flex flex-col items-center">
+                    <div className="text-base md:text-lg font-bold text-[#1E88E5] mb-1">真需求</div>
+                    <div className="text-[10px] md:text-xs text-gray-500 font-medium leading-tight">
+                      0.6 × 信息匹配 + 0.4 × 受众精准
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <div className="text-base md:text-lg font-bold text-[#1E88E5] mb-1">声量</div>
+                    <div className="text-[10px] md:text-xs text-gray-500 font-medium leading-tight">
+                      0.6 × 传播质量 + 0.4 × 媒体分级
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <div className="text-base md:text-lg font-bold text-[#1E88E5] mb-1">获客效能</div>
+                    <div className="text-[10px] md:text-xs text-gray-500 font-medium leading-tight">
+                      计算获取每个新客户需投入的成本，得出项目能否高效吸引并转化潜在客户
+                    </div>
+                  </div>
+                </div>
+
+                {/* 底部补充说明 */}
+                <div className="mt-2 text-[10px] md:text-xs text-gray-400 italic space-y-1">
+                  <div>* 传播质量 = Log10(阅读量 × 权重 + 互动量 × 权重 + 10) × 系数</div>
                   <div>* 信息匹配：项目传递信息能否使目标受众共鸣并感到明确获益</div>
-                  <div>* 获客效能：计算获取每个新客户需投入的成本，得出项目能否高效吸引并转化潜在客户</div>
-                  <div>* 传播质量 = Log10(阅读量 × 阅读权重 + 互动量 × 互动权重 + 10) × 系数</div>
                 </div>
-                <PatientDemandFramework />
               </div>
+              <PatientDemandFramework />
             </div>
           )}
         </div>
