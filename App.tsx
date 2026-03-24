@@ -784,6 +784,9 @@ const App: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-t border-gray-100 pt-6">
                   <div className="flex flex-col items-center">
                     <div className="text-base md:text-lg font-bold text-[#1E88E5] mb-1">真需求</div>
+                    <div className="text-[10px] md:text-xs text-gray-500 font-medium leading-tight mb-1">
+                      项目传递信息能否使目标受众共鸣并感到明确获益
+                    </div>
                     <div className="text-[10px] md:text-xs text-gray-500 font-medium leading-tight">
                       0.6 × 信息匹配 + 0.4 × 受众精准
                     </div>
@@ -805,7 +808,6 @@ const App: React.FC = () => {
                 {/* 底部补充说明 */}
                 <div className="mt-2 text-[10px] md:text-xs text-gray-400 italic space-y-1">
                   <div>* 传播质量 = Log10(阅读量 × 权重 + 互动量 × 权重 + 10) × 系数</div>
-                  <div>* 信息匹配：项目传递信息能否使目标受众共鸣并感到明确获益</div>
                 </div>
               </div>
               <PatientDemandFramework />
