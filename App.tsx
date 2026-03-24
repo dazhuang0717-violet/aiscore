@@ -990,100 +990,144 @@ const App: React.FC = () => {
         )}
 
         {activeTab === 'tab3' && (
-          <div className="animate-fadeIn min-w-0">
+          <div className="animate-fadeIn min-w-0" id="project-report-content">
             <div className="apple-card mb-8">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold">🎯 获客效能评分</h3>
-                {!acquisitionProjectResult && (
-                  <button 
-                    onClick={analyzeAcquisitionEffectiveness} 
-                    className="st-button-primary shadow-md hover:shadow-lg"
-                    disabled={isProcessing}
-                  >
-                    {isProcessing ? "⏳ 正在分析..." : "🚀 开始获客效能评分"}
-                  </button>
-                )}
+              <div className="flex flex-col gap-1 mb-8">
+                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                  基于 {(() => {
+                    const d = new Date();
+                    return `${d.getFullYear()}年${String(d.getMonth() + 1).padStart(2, '0')}月${String(d.getDate()).padStart(2, '0')}日`;
+                  })()} 大数据
+                </div>
+                <h3 className="text-2xl font-bold">📈 项目评分报告：{projectName || '未命名项目'}</h3>
               </div>
-              
-              {acquisitionProjectResult ? (
-                <div className="animate-fadeIn">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-                    <div className="st-metric md:col-span-1">
-                    <div className="st-metric-label">获客效能潜力</div>
-                      <div className="st-metric-value text-blue-600">{acquisitionProjectResult.score.toFixed(1)}/10</div>
-                    </div>
-                    <div className="md:col-span-3 bg-blue-50/50 p-6 rounded-2xl border border-blue-100 shadow-sm">
-                      <h4 className="font-bold text-blue-700 text-sm mb-3 flex items-center gap-2">
-                        <span className="bg-blue-600 text-white p-1 rounded-lg text-[10px]">💡</span> 获客效能简评
-                      </h4>
-                      <p className="text-sm text-gray-700 leading-relaxed bg-white/50 p-4 rounded-xl border border-blue-50">{acquisitionProjectResult.comment}</p>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-10 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
-                </div>
-              )}
-            </div>
 
-            {!batchResults ? (
-              <div className="apple-card bg-gray-50/50 border-dashed">
-                <div className="st-alert st-info">
-                  <span>📈</span>
-                  <div className="font-medium">查看其余评分，请先完成“新闻稿评分”和“媒体报道评分”。</div>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-10 w-full overflow-hidden" id="project-report-content">
-                <div className="apple-card">
-                  <div className="flex flex-col gap-1 mb-8">
-                    <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
-                      基于 {(() => {
-                        const d = new Date();
-                        return `${d.getFullYear()}年${String(d.getMonth() + 1).padStart(2, '0')}月${String(d.getDate()).padStart(2, '0')}日`;
-                      })()} 大数据
-                    </div>
-                    <h3 className="text-2xl font-bold">📈 项目评分：{projectName || '未命名项目'}</h3>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-                    {[{ l: "项目总分", k: "项目总分", ck: "总分简评" }, { l: "真需求", k: "真需求", ck: "真需求简评" }, { l: "声量", k: "声量", ck: "声量简评" }].map(m => {
+              {/* 1. 项目总分 (最上方) */}
+              {batchResults && (
+                <div className="bg-gradient-to-br from-blue-50 to-white border border-blue-100 p-8 rounded-3xl shadow-sm mb-10 flex flex-col items-center">
+                  <div className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-3">项目总分</div>
+                  <div className="text-7xl font-bold text-blue-700 mb-6">
+                    {(() => {
                       const categories = Array.from(new Set(batchResults.map(r => r.媒体类型))).filter(c => c);
-                      if (categories.length === 0) return (
-                        <div key={m.l} className="st-metric">
-                          <div className="st-metric-label">{m.l}</div>
-                          <div className="st-metric-value">0.0/10</div>
-                        </div>
-                      );
+                      if (categories.length === 0) return "0.0";
                       const categoryAverages = categories.map(cat => {
                         const catResults = batchResults.filter(r => r.媒体类型 === cat);
-                        const sum = catResults.reduce((a, b) => a + parseFloat(b[m.k as keyof BatchResult] as string || "0"), 0);
+                        const sum = catResults.reduce((a, b) => a + parseFloat(b["项目总分"] as string || "0"), 0);
                         return sum / catResults.length;
                       });
-                      const avgVal = categoryAverages.reduce((a, b) => a + b, 0) / categories.length;
-                      
-                      const comment = batchResults[0]?.[m.ck as keyof BatchResult] as string;
-                      return (
-                        <div key={m.l} className={`st-metric ${m.l === '项目总分' ? 'highlighted shadow-sm' : ''}`}>
-                          <div className={`st-metric-label ${m.l === '项目总分' ? 'text-blue-600 font-medium' : ''}`}>{m.l}</div>
-                          <div className={`st-metric-value ${m.l === '项目总分' ? 'text-blue-700' : ''}`}>{avgVal.toFixed(1)}/10</div>
-                          {comment && (
-                            <div className="mt-4 p-4 bg-gray-50/80 rounded-xl border border-gray-100 text-xs text-gray-700 leading-relaxed shadow-inner">
-                              <span className="font-bold text-blue-600 block mb-1">💡 AI 简评：</span>
-                              {comment}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                      return (categoryAverages.reduce((a, b) => a + b, 0) / categories.length).toFixed(1);
+                    })()}
+                    <span className="text-2xl text-blue-400 ml-1">/10</span>
                   </div>
+                  
+                  {/* 优化后的总分简评区域 */}
+                  <div className="bg-white/80 border border-blue-50 p-6 rounded-2xl max-w-3xl w-full shadow-inner">
+                    <h4 className="font-bold text-blue-700 text-[10px] mb-3 flex items-center justify-center gap-2 uppercase tracking-widest">
+                      <span className="bg-blue-600 text-white px-1.5 py-0.5 rounded text-[8px]">✨</span> AI 简评
+                    </h4>
+                    <p className="text-sm text-gray-700 text-left leading-relaxed font-medium">
+                      {batchResults[0]?.总分简评 || "基于项目整体表现的综合评估结果。"}
+                    </p>
+                  </div>
+                </div>
+              )}
 
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 pt-6 w-full items-start">
+              {/* 2. 获客效能评分 (总分下方) */}
+              <div className="mb-10">
+                <div className="flex justify-between items-center mb-6">
+                  <h4 className="text-lg font-bold text-gray-800">🎯 获客效能评分</h4>
+                  {!acquisitionProjectResult && (
+                    <button 
+                      onClick={analyzeAcquisitionEffectiveness} 
+                      className="st-button-primary shadow-md hover:shadow-lg"
+                      disabled={isProcessing}
+                    >
+                      {isProcessing ? "⏳ 正在分析..." : "🚀 开始获客效能评分"}
+                    </button>
+                  )}
+                </div>
+                
+                {acquisitionProjectResult ? (
+                  <div className="animate-fadeIn">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                      <div className="st-metric md:col-span-1">
+                      <div className="st-metric-label">获客效能潜力</div>
+                        <div className="st-metric-value text-blue-600">{acquisitionProjectResult.score.toFixed(1)}/10</div>
+                      </div>
+                      <div className="md:col-span-3 bg-blue-50/50 p-6 rounded-2xl border border-blue-100 shadow-sm">
+                        <h4 className="font-bold text-blue-700 text-sm mb-3 flex items-center gap-2">
+                          <span className="bg-blue-600 text-white p-1 rounded-lg text-[10px]">💡</span> 获客效能简评
+                        </h4>
+                        <p className="text-sm text-gray-700 leading-relaxed bg-white/50 p-4 rounded-xl border border-blue-50">{acquisitionProjectResult.comment}</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-10 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
+                    <p className="text-sm text-gray-400">点击按钮开始分析项目整体获客效能</p>
+                  </div>
+                )}
+              </div>
+
+              {/* 引导提示：仅在未出总分时显示 */}
+              {!batchResults && (
+                <div className="mb-10">
+                  <div className="flex items-center gap-3 py-4 px-6 rounded-2xl bg-gray-50 border border-gray-100 text-gray-500">
+                    <span className="text-lg opacity-60">📈</span>
+                    <div className="text-xs font-medium">
+                      查看其余评分，请先完成“新闻稿评分”和“媒体报道评分”。
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 3. 真需求 & 声量 (获客效能下方，采用统一排版) */}
+              {batchResults && (
+                <div className="space-y-10 mb-12">
+                  {[{ l: "真需求", k: "真需求", ck: "真需求简评", icon: "💎" }, { l: "声量", k: "声量", ck: "声量简评", icon: "🔊" }].map(m => {
+                    const categories = Array.from(new Set(batchResults.map(r => r.媒体类型))).filter(c => c);
+                    if (categories.length === 0) return null;
+                    const categoryAverages = categories.map(cat => {
+                      const catResults = batchResults.filter(r => r.媒体类型 === cat);
+                      const sum = catResults.reduce((a, b) => a + parseFloat(b[m.k as keyof BatchResult] as string || "0"), 0);
+                      return sum / catResults.length;
+                    });
+                    const avgVal = categoryAverages.reduce((a, b) => a + b, 0) / categories.length;
+                    const comment = batchResults[0]?.[m.ck as keyof BatchResult] as string;
+                    
+                    return (
+                      <div key={m.l} className="animate-fadeIn">
+                        <h4 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                          <span>{m.icon}</span> {m.l}评分
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                          <div className="st-metric md:col-span-1">
+                            <div className="st-metric-label">{m.l}平均分</div>
+                            <div className="st-metric-value text-blue-600">{avgVal.toFixed(1)}/10</div>
+                          </div>
+                          <div className="md:col-span-3 bg-gray-50/50 p-6 rounded-2xl border border-gray-100 shadow-sm">
+                            <h4 className="font-bold text-blue-700 text-sm mb-3 flex items-center gap-2">
+                              <span className="bg-blue-600 text-white p-1 rounded-lg text-[10px]">💡</span> {m.l}简评
+                            </h4>
+                            <p className="text-sm text-gray-700 leading-relaxed bg-white/50 p-4 rounded-xl border border-gray-50">{comment || "暂无简评"}</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* 4. 图表展示 (分值下方) */}
+              {batchResults && (
+                <div className="space-y-10 w-full overflow-hidden">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-6 w-full items-start">
                     <div className="bg-white p-6 border border-gray-100 rounded-2xl shadow-sm min-h-[440px] flex flex-col overflow-hidden min-w-0">
                       <p className="text-[10px] font-bold text-gray-400 mb-6 uppercase tracking-widest text-center">🕸️ 传播价值分布雷达</p>
                       <div id="radar-chart" className="flex-1 w-full min-h-[380px]"></div>
                     </div>
                     <div className="bg-white p-6 border border-gray-100 rounded-2xl shadow-sm min-h-[440px] flex flex-col overflow-hidden min-w-0">
-                      <p className="text-[10px] font-bold text-gray-400 mb-6 uppercase tracking-widest text-center">💠 媒体价值矩阵（真需求 vs 声量）</p>
+                      <p className="text-[10px] font-bold text-gray-400 mb-6 uppercase tracking-widest text-center">💠 媒体价值矩阵</p>
                       <div id="scatter-chart" className="flex-1 w-full min-h-[380px]"></div>
                     </div>
                   </div>
@@ -1120,8 +1164,8 @@ const App: React.FC = () => {
                     <button onClick={exportToPDF} className="st-button-primary px-12 py-4 rounded-full text-base shadow-xl hover:shadow-2xl transform transition-all active:scale-95">📥 下载评分报告（PDF）</button>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         )}
       </div>
