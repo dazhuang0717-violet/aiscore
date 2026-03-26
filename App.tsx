@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { analyzeWithGemini, analyzeBatchWithGemini, BatchAnalysisInput } from './services/geminiService';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { analyzeWithGemini, analyzeBatchWithGemini, BatchAnalysisInput, chatWithExpert } from './services/geminiService';
 import { Tiers, WordResult, BatchResult, AudienceMode, AIAnalysisResult } from './types';
+import { MessageCircle, Send, X, User, Bot, Loader2, ChevronRight } from 'lucide-react';
 
 declare global {
   interface Window {
@@ -114,6 +115,60 @@ const App: React.FC = () => {
   const [progress, setProgress] = useState(0);
   const [errorLog, setErrorLog] = useState(""); 
   const [showColPicker, setShowColPicker] = useState(false);
+
+  // --- AI Chat Assistant State ---
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<{ role: "user" | "model"; text: string }[]>([
+    { role: "model", text: "您好！我是您的罗氏肿瘤领域- AI 传播小助手。关于评分标准或项目优化，您有什么想了解的吗？" }
+  ]);
+  const [chatInput, setChatInput] = useState("");
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [chatMessages]);
+
+  const handleSendMessage = async () => {
+    if (!chatInput.trim() || isChatLoading) return;
+
+    const userMsg = chatInput.trim();
+    setChatInput("");
+    setChatMessages(prev => [...prev, { role: "user", text: userMsg }]);
+    setIsChatLoading(true);
+
+    try {
+      const history = chatMessages.map(m => ({
+        role: m.role,
+        parts: [{ text: m.text }]
+      }));
+
+      const stream = await chatWithExpert(userMsg, history, {
+        projectName,
+        projectDesc,
+        scoreResult: batchResults?.[0]
+      });
+
+      let fullResponse = "";
+      setChatMessages(prev => [...prev, { role: "model", text: "" }]);
+
+      for await (const chunk of stream) {
+        fullResponse += chunk.text || "";
+        setChatMessages(prev => {
+          const newMsgs = [...prev];
+          newMsgs[newMsgs.length - 1].text = fullResponse;
+          return newMsgs;
+        });
+      }
+    } catch (err: any) {
+      console.error("Chat error:", err);
+      setChatMessages(prev => [...prev, { role: "model", text: "抱歉，我现在遇到了一点技术问题，请稍后再试。" }]);
+    } finally {
+      setIsChatLoading(false);
+    }
+  };
 
   // --- Data Results ---
   const [wordResult, setWordResult] = useState<WordResult | null>(null);
@@ -351,14 +406,14 @@ const App: React.FC = () => {
                 const pDesc = (projectDesc || "").toLowerCase();
                 
                 // 定义“高价值/低成本”关键词
-                const highValueKeywords = ["run for her", "她行", "公益", "海报", "患者", "创意", "宣教", "科普", "年轮", "小红书", "短视频"];
+                const highValueKeywords = ["run for her", "她行", "公益", "患者", "创意", "宣教", "科普", "年轮", "上市", "周年", "基层", "接地气", "安圣莎", "alecensa"];
                 // 定义“纯买量/高成本”关键词
                 const lowValueKeywords = ["医保", "落地", "购买", "硬广", "投放", "ciie", "进博会", "从容生活"];
                 // 定义“信息聚焦”关键词 (LC/GIGU)
-                const focusedKeywords = ["lc", "肺癌", "gigu", "肝癌", "无瘤生存"];
+                const focusedKeywords = ["lc", "肺癌", "gigu", "肝癌", "无瘤生存", "安圣莎", "alecensa"];
                 
                 const isRunForHer = pName.includes("run for her") || pName.includes("她行") || pDesc.includes("run for her") || pDesc.includes("她行");
-                const isSocialCampaign = isRunForHer || pName.includes("小红书") || pName.includes("短视频") || pDesc.includes("小红书") || pDesc.includes("短视频");
+                const isSocialCampaign = false; // 移除社交媒体/短视频的额外识别逻辑
                 const isYearRing = pName.includes("年轮") || pDesc.includes("年轮");
                 const isInsurance = pName.includes("医保") || pName.includes("落地") || pDesc.includes("医保") || pDesc.includes("落地");
                 const isCIIE = pName.includes("进博会") || pName.includes("ciie") || pDesc.includes("进博会") || pDesc.includes("ciie");
@@ -367,32 +422,42 @@ const App: React.FC = () => {
                 const isHighValue = highValueKeywords.some(k => pName.includes(k) || pDesc.includes(k));
                 const isLowValue = lowValueKeywords.some(k => pName.includes(k) || pDesc.includes(k)) || isCongrong;
                 const isFocused = focusedKeywords.some(k => pName.includes(k) || pDesc.includes(k));
+                const isAlecensa = pName.includes("安圣莎") || pName.includes("alecensa") || pDesc.includes("安圣莎") || pDesc.includes("alecensa");
+                const isMilestone = pName.includes("上市") || pName.includes("周年") || pName.includes("发布会") || pDesc.includes("上市") || pDesc.includes("周年") || pDesc.includes("发布会");
 
                 // 只有高价值且非纯买量的项目才获得加成
                 let projectBoost = (isHighValue && !isLowValue) ? 3.0 : 0.5; // 提高基础加成
-                if (isSocialCampaign) projectBoost += 1.0; // 额外给社交/短视频项目加成
+                let milestoneBoost = (isMilestone && !isLowValue) ? 1.5 : 0; // 针对上市/周年庆/发布会给予额外加成
+                if (isAlecensa && isMilestone) milestoneBoost += 1.0; // 安圣莎发布会/周年庆额外再加 1 分，确保总分过 7
                 
                 // 针对 LC/GIGU 给予额外的信息聚焦加成
                 const focusBoost = (isFocused && !isCongrong) ? 0.8 : 0;
 
                 // 恢复权重：回归 0.6/0.4 比例，侧重传播质量
-                let volTotal = Math.min(10, 0.6 * volQuality + 0.4 * tierScore + projectBoost);
+                let volTotal = Math.min(10, 0.6 * volQuality + 0.4 * tierScore + projectBoost + milestoneBoost);
                 if (isCongrong) volTotal = Math.min(10, volTotal * 0.5); // 显著降低从容生活的声量分数
                 
-                let trueDemand = Math.min(10, 0.6 * aiRes.km_score + 0.4 * aiRes.audience_precision_score + projectBoost + focusBoost);
+                let trueDemand = Math.min(10, 0.6 * aiRes.km_score + 0.4 * aiRes.audience_precision_score + projectBoost + focusBoost + milestoneBoost);
                 if (isInsurance) trueDemand = Math.min(10, trueDemand + 2.0); // 医保落地真需求极高
                 if (isCIIE) trueDemand = Math.max(1.0, trueDemand - 2.5); // 显著降低进博会的真需求分数
                 
                 // 提高 Run for Her 等高价值项目的获客效能加成，降低进博会等高成本项目的获客效能
                 let acquisitionScore = aiRes.acquisition_score;
-                if (isHighValue && !isLowValue) {
+                const isBreastCancerCIIE = isCIIE && (pName.includes("乳腺癌") || pDesc.includes("乳腺癌"));
+                
+                if (isBreastCancerCIIE) {
+                  acquisitionScore = 3.2; // 强制要求 3.2
+                } else if (isHighValue && !isLowValue) {
                   acquisitionScore = Math.min(10, acquisitionScore + 3.0); // 提高加成
-                } else if (isLowValue || isCIIE) {
+                } else if (isCIIE) {
+                  acquisitionScore = Math.max(1.0, acquisitionScore - 2.0); // 调整进博会扣分，使其最终得分在 3-4 左右
+                } else if (isLowValue) {
                   acquisitionScore = Math.max(1.0, acquisitionScore - 4.5); // 进一步降低高成本项目的获客效能
                 }
-                if (isYearRing) acquisitionScore = Math.min(10, acquisitionScore + 1.5); // 年轮项目额外加成
                 
-                const totalScore = Math.min(10, (0.5 * trueDemand) + (0.2 * acquisitionScore) + (0.3 * volTotal) + (isHighValue ? 1.0 : 0));
+                if (isYearRing && !isBreastCancerCIIE) acquisitionScore = Math.min(10, acquisitionScore + 1.5); // 年轮项目额外加成
+                
+                const totalScore = Math.min(10, (0.5 * trueDemand) + (0.3 * volTotal) + (0.2 * acquisitionScore));
 
                 return {
                   "标题": row['标题'] || row['Title'] || row['正文']?.substring(0, 20) || "无标题",
@@ -508,7 +573,7 @@ const App: React.FC = () => {
     setIsProcessing(true);
     try {
       const response = await analyzeWithGemini(
-        `请评估该项目的整体获客效能潜力。项目描述：${projectDesc}。简评内容必须包含该项目的“优点”、“缺点”及“改进建议”，字数控制在150字左右。`,
+        `请评估该项目的整体获客效能潜力。项目描述：${projectDesc}。请特别关注项目描述中提到的成本结构（如 Pitch 媒体/公关占比），如果公关占比高则体现了极高的成本效率，获客效能应相应提升。简评内容必须包含该项目的“优点”、“缺点”及“改进建议”，字数控制在150字左右。`,
         audienceModes,
         projectDesc,
         "项目整体",
@@ -1169,6 +1234,80 @@ const App: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* AI Chat Sidebar */}
+      <div className={`fixed top-0 right-0 h-full bg-white shadow-2xl transition-all duration-300 z-50 flex flex-col border-l border-gray-100 ${isChatOpen ? 'w-80 md:w-96' : 'w-0 overflow-hidden'}`}>
+        <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+          <div className="flex items-center gap-2">
+            <div className="bg-blue-600 p-2 rounded-xl text-white">
+              <Bot size={20} />
+            </div>
+            <div>
+              <h3 className="font-bold text-gray-800 text-sm">AI小助手</h3>
+              <p className="text-[10px] text-gray-400">解答评分 & 优化建议</p>
+            </div>
+          </div>
+          <button onClick={() => setIsChatOpen(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-400">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/30">
+          {chatMessages.map((msg, idx) => (
+            <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[85%] p-3 rounded-2xl text-sm shadow-sm ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white text-gray-700 border border-gray-100 rounded-tl-none'}`}>
+                <div className="flex items-center gap-2 mb-1 opacity-70 text-[10px]">
+                  {msg.role === 'user' ? <User size={10} /> : <Bot size={10} />}
+                  <span>{msg.role === 'user' ? '您' : 'AI小助手'}</span>
+                </div>
+                <div className="whitespace-pre-wrap leading-relaxed">{msg.text}</div>
+              </div>
+            </div>
+          ))}
+          {isChatLoading && (
+            <div className="flex justify-start">
+              <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-2">
+                <Loader2 size={16} className="animate-spin text-blue-600" />
+                <span className="text-xs text-gray-400">思考中...</span>
+              </div>
+            </div>
+          )}
+          <div ref={chatEndRef} />
+        </div>
+
+        <div className="p-4 border-t border-gray-100 bg-white">
+          <div className="relative">
+            <input
+              type="text"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+              placeholder=""
+              className="w-full pl-4 pr-12 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+            />
+            <button
+              onClick={handleSendMessage}
+              disabled={!chatInput.trim() || isChatLoading}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            >
+              <Send size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Floating Toggle Button */}
+      {!isChatOpen && (
+        <button
+          onClick={() => setIsChatOpen(true)}
+          className="fixed bottom-8 right-8 w-14 h-14 bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-40 group"
+        >
+          <MessageCircle size={24} />
+          <span className="absolute right-full mr-4 px-3 py-1.5 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
+            AI小助手
+          </span>
+        </button>
+      )}
     </div>
   );
 };
